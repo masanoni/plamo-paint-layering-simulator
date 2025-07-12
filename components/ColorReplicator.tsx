@@ -4,7 +4,7 @@ import { getReplicationRecipe } from '../services/geminiService';
 import EyedropperIcon from './icons/EyedropperIcon';
 import GeneratedRecipe from './GeneratedRecipe';
 import ProductAffiliateLinks from './ProductAffiliateLinks';
-import { RecipeConditions, FinishTypeGoal, TopCoatFinish, ParsedRecipe, Paint, PaintSystem } from '../types';
+import { RecipeConditions, FinishTypeGoal, TopCoatFinish, ParsedRecipe, Paint, PaintSystem, PaintSystemDisplay } from '../types';
 
 interface ColorReplicatorProps {
     onApplyRecipe: (recipe: ParsedRecipe) => void;
@@ -209,8 +209,8 @@ const ColorReplicator: React.FC<ColorReplicatorProps> = ({ onApplyRecipe, paints
                             <div>
                                 <label className="block text-sm font-medium text-slate-300 mb-1">4. 使用する塗料系統</label>
                                 <div className="grid grid-cols-3 gap-2">
-                                    {(Object.values(PaintSystem)).map(system => (
-                                        <button key={system} onClick={() => handleConditionChange('paintSystem', system)} className={`w-full px-3 py-1.5 text-sm rounded-md transition-colors ${conditions.paintSystem === system ? 'bg-sky-600 text-white font-bold ring-2 ring-sky-400' : 'bg-slate-800 hover:bg-slate-600'}`}>{system}</button>
+                                    {Object.values(PaintSystem).map(system => (
+                                        <button key={system} onClick={() => handleConditionChange('paintSystem', system)} className={`w-full px-3 py-1.5 text-sm rounded-md transition-colors ${conditions.paintSystem === system ? 'bg-sky-600 text-white font-bold ring-2 ring-sky-400' : 'bg-slate-800 hover:bg-slate-600'}`}>{PaintSystemDisplay[system]}</button>
                                     ))}
                                 </div>
                             </div>

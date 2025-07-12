@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Brand, Paint, PaintLayer, PaintType } from '../types';
+import { Brand, Paint, PaintLayer, PaintType, BrandDisplay } from '../types';
 import TrashIcon from './icons/TrashIcon';
 import DragHandleIcon from './icons/DragHandleIcon';
 import MixerIcon from './icons/MixerIcon';
@@ -112,7 +112,7 @@ const LayerItem: React.FC<LayerItemProps> = ({ layer, index, paints, onUpdate, o
         <div className="flex-grow space-y-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                  <select value={layer.brand} onChange={handleBrandChange} disabled={!!layer.mixData} className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-sky-500 focus:outline-none disabled:bg-slate-700 disabled:opacity-70">
-                    {Object.values(Brand).map(b => <option key={b} value={b}>{b}</option>)}
+                    {Object.values(Brand).map(b => <option key={b} value={b}>{BrandDisplay[b]}</option>)}
                 </select>
                 
                 {layer.brand !== Brand.OTHER && !layer.mixData ? (
