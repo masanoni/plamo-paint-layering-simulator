@@ -88,18 +88,18 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
     properties: {
         baseColorHex: {
             type: Type.STRING,
-            description: "提案する下地の色。HEXコード形式で指定。",
+            description: "The proposed base color in HEX code format.",
         },
         layers: {
             type: Type.ARRAY,
-            description: "本塗装のレイヤー。下から順番に重ねる。",
+            description: "The main paint layers, applied in order from bottom to top.",
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    coats: { type: Type.INTEGER, description: "吹付回数の目安 (1-10)。" },
-                    type: { type: Type.STRING, enum: Object.values(PaintType), description: "レイヤーの塗料タイプ。" },
-                    paintSystem: { type: Type.STRING, enum: Object.values(PaintSystem), description: "レイヤーの塗料系統。ユーザー指定の系統と一致させること。" },
-                    finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss', 'velvet'], description: "レイヤーの塗料の仕上がり。" },
+                    coats: { type: Type.INTEGER, description: "Estimated number of coats (1-10)." },
+                    type: { type: Type.STRING, enum: Object.values(PaintType), description: "The paint type for the layer." },
+                    paintSystem: { type: Type.STRING, enum: Object.values(PaintSystem), description: "The paint system for the layer. Must match the user's specified system." },
+                    finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss', 'velvet'], description: "The paint finish for the layer." },
                     mixData: {
                         type: Type.OBJECT,
                         properties: {
@@ -108,8 +108,8 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
                                 items: {
                                     type: Type.OBJECT,
                                     properties: {
-                                        code: { type: Type.STRING, description: "利用可能な塗料リストにある製品コード。" },
-                                        ratio: { type: Type.INTEGER, description: "混合比率(%)。合計で100になるように調整。" }
+                                        code: { type: Type.STRING, description: "Product code from the available paints list." },
+                                        ratio: { type: Type.INTEGER, description: "Mixing ratio (%). Should be adjusted to total 100%." }
                                     },
                                     required: ["code", "ratio"]
                                 }
@@ -123,13 +123,13 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
         },
         topCoat: {
             type: Type.OBJECT,
-            description: "最終仕上げのトップコートレイヤー。不要な場合はnull。",
+            description: "The final top coat layer. Null if not needed.",
             nullable: true,
             properties: {
-                coats: { type: Type.INTEGER, description: "吹付回数の目安 (1-10)。" },
-                type: { type: Type.STRING, enum: [PaintType.CLEAR], description: "トップコートは必ずクリアータイプ。" },
-                paintSystem: { type: Type.STRING, enum: Object.values(PaintSystem), description: "トップコートの塗料系統。ユーザー指定の系統と一致させること。" },
-                finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss'], description: "ユーザーが指定したトップコートの仕上がり。" },
+                coats: { type: Type.INTEGER, description: "Estimated number of coats (1-10)." },
+                type: { type: Type.STRING, enum: [PaintType.CLEAR], description: "Top coat must be a CLEAR type." },
+                paintSystem: { type: Type.STRING, enum: Object.values(PaintSystem), description: "The paint system for the top coat. Must match the user's specified system." },
+                finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss'], description: "The user-specified finish for the top coat." },
                 mixData: {
                     type: Type.OBJECT,
                     properties: {
@@ -138,8 +138,8 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
                             items: {
                                 type: Type.OBJECT,
                                 properties: {
-                                    code: { type: Type.STRING, description: "利用可能な塗料リストにある製品コード。" },
-                                    ratio: { type: Type.INTEGER, description: "100%単体で使用。" }
+                                    code: { type: Type.STRING, description: "Product code from the available paints list." },
+                                    ratio: { type: Type.INTEGER, description: "Used as a single paint (100%)." }
                                 },
                                 required: ["code", "ratio"]
                             }
@@ -152,12 +152,12 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
         },
         products: {
             type: Type.ARRAY,
-            description: "レシピで使用したすべての商品名（例: GSIクレオス 水性ホビーカラー ホワイト (H1)）のリスト。",
+            description: "A list of all product names used in the recipe (e.g., GSI Creos Aqueous Hobby Color White (H1)).",
             items: { type: Type.STRING }
         },
         recipeText: {
             type: Type.STRING,
-            description: "人間が読むための、ステップバイステップの詳細な日本語の塗装手順解説。HTMLタグは含めないプレーンテキストで、改行を適切に使用すること。"
+            description: "A detailed step-by-step painting instruction guide in Japanese for human readers. Use newlines appropriately, no HTML tags."
         }
     },
     required: ["baseColorHex", "layers", "topCoat", "products", "recipeText"]
@@ -219,14 +219,14 @@ export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: P
     const paintInfoSchema = {
         type: Type.OBJECT,
         properties: {
-            brand: { type: Type.STRING, enum: Object.values(Brand), description: "塗料のブランド名 (例: GSIクレオス, ガイアノーツ)" },
-            series: { type: Type.STRING, description: "製品シリーズ名 (例: Mr.カラーGX, 水性ホビーカラー)。該当しない場合はnull", nullable: true },
-            name: { type: Type.STRING, description: "塗料の正式な製品名 (例: クールホワイト, Ex-クリアー)" },
-            code: { type: Type.STRING, description: "製品コード (例: GX1, H1, N1)。不明な場合は'N/A'とする。" },
-            hex: { type: Type.STRING, description: "塗料の色を表すHEXコード (例: #ffffff)。クリアー系の場合は#ffffffとする。" },
-            type: { type: Type.STRING, enum: Object.values(PaintType), description: "塗料のタイプ (通常色, メタリック, パール, クリアー)。" },
-            paintSystem: { type: Type.STRING, enum: Object.values(PaintSystem), description: "塗料の系統 (ラッカー, 水性, アクリジョン)。" },
-            finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss', 'velvet'], description: "塗料のデフォルトの仕上がり (光沢, つや消し, 半光沢, ベルベット)。" },
+            brand: { type: Type.STRING, enum: Object.values(Brand), description: "Paint brand name (e.g., GSI Creos, Gaia Notes)" },
+            series: { type: Type.STRING, description: "Product series name (e.g., Mr.Color GX, Aqueous Hobby Color). Null if not applicable.", nullable: true },
+            name: { type: Type.STRING, description: "Official product name of the paint (e.g., Cool White, Ex-Clear)." },
+            code: { type: Type.STRING, description: "Product code (e.g., GX1, H1, N1). 'N/A' if unknown." },
+            hex: { type: Type.STRING, description: "HEX code representing the paint color (e.g., #ffffff). Use #ffffff for clear paints." },
+            type: { type: Type.STRING, enum: Object.values(PaintType), description: "The type of paint (Normal, Metallic, Pearl, Clear)." },
+            paintSystem: { type: Type.STRING, enum: Object.values(PaintSystem), description: "The paint system (Lacquer, Water-based, Acrysion)." },
+            finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss', 'velvet'], description: "The default finish of the paint (gloss, matte, semi-gloss, velvet)." },
         },
         required: ["brand", "series", "name", "code", "hex", "type", "paintSystem", "finish"]
     };
