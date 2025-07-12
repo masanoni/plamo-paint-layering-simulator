@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { getReplicationRecipe } from '../services/geminiService';
 import EyedropperIcon from './icons/EyedropperIcon';
@@ -8,9 +9,10 @@ import { RecipeConditions, FinishTypeGoal, TopCoatFinish, ParsedRecipe, Paint, P
 interface ColorReplicatorProps {
     onApplyRecipe: (recipe: ParsedRecipe) => void;
     paints: Paint[];
+    apiKey: string;
 }
 
-const ColorReplicator: React.FC<ColorReplicatorProps> = ({ onApplyRecipe, paints }) => {
+const ColorReplicator: React.FC<ColorReplicatorProps> = ({ onApplyRecipe, paints, apiKey }) => {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [targetColor, setTargetColor] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -97,12 +99,12 @@ const ColorReplicator: React.FC<ColorReplicatorProps> = ({ onApplyRecipe, paints
     };
 
     const handleGetRecipe = async () => {
-        if (!targetColor) return;
+        if (!targetColor || !apiKey) return;
         setIsLoading(true);
         setRecipe(null);
         setError(null);
         try {
-            const result = await getReplicationRecipe(targetColor, conditions, paints);
+            const result = await getReplicationRecipe(targetColor, conditions, paints, apiKey);
             setRecipe(result);
 
         } catch (e) {
@@ -217,7 +219,7 @@ const ColorReplicator: React.FC<ColorReplicatorProps> = ({ onApplyRecipe, paints
 
                     <button
                         onClick={handleGetRecipe}
-                        disabled={!targetColor || isLoading}
+                        disabled={!targetColor || isLoading || !apiKey}
                         className="w-full px-4 py-2 font-bold text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors duration-200"
                     >
                         {isLoading ? 'AIがレシピを生成中...' : 'この条件で再現レシピを生成する'}

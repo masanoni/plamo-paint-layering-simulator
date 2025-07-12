@@ -2,14 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { PaintLayer, Paint, PaintFinish, RecipeConditions, ParsedRecipe, PaintType, ParsedLayer, Brand, PaintSystem } from '../types';
 
-if (!process.env.API_KEY) {
-  // This is a placeholder for the build-time check.
-  // The environment variable should be set in the actual environment.
-  console.warn("API_KEY environment variable not set. Gemini API calls will fail.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
-
 const getFinishText = (finish: PaintFinish): string => {
   switch (finish) {
     case 'gloss': return '光沢';
@@ -32,9 +24,9 @@ const getMixDetails = (layer: PaintLayer, availablePaints: Paint[]): string => {
 };
 
 
-export const getPaintingAdvice = async (baseColor: string, layers: PaintLayer[], paints: Paint[]): Promise<string> => {
-  if (!process.env.API_KEY) {
-    return "エラー: APIキーが設定されていません。";
+export const getPaintingAdvice = async (baseColor: string, layers: PaintLayer[], paints: Paint[], apiKey: string): Promise<string> => {
+  if (!apiKey) {
+    return "エラー: APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。";
   }
 
   if (layers.length === 0) {
@@ -63,6 +55,7 @@ ${layerDescriptions}
 `;
 
   try {
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -78,9 +71,9 @@ ${layerDescriptions}
 };
 
 
-export const getReplicationRecipe = async (targetColor: string, conditions: RecipeConditions, paints: Paint[]): Promise<ParsedRecipe> => {
-  if (!process.env.API_KEY) {
-      throw new Error("APIキーが設定されていません。");
+export const getReplicationRecipe = async (targetColor: string, conditions: RecipeConditions, paints: Paint[], apiKey: string): Promise<ParsedRecipe> => {
+  if (!apiKey) {
+      throw new Error("APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
   }
 
   const filteredPaints = paints.filter(p => p.paintSystem === conditions.paintSystem);
@@ -195,6 +188,7 @@ ${simplifiedPaints}
 `;
 
   try {
+      const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -215,9 +209,9 @@ ${simplifiedPaints}
   }
 };
 
-export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: Paint[]): Promise<Omit<Paint, 'amazonUrl' | 'rakutenUrl'>> => {
-    if (!process.env.API_KEY) {
-        throw new Error("APIキーが設定されていません。");
+export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: Paint[], apiKey: string): Promise<Omit<Paint, 'amazonUrl' | 'rakutenUrl'>> => {
+    if (!apiKey) {
+        throw new Error("APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
     }
 
     const simplifiedPaints = availablePaints.map(p => `${p.name} (${p.code})`).join(', ');
@@ -245,6 +239,7 @@ export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: P
     `;
 
     try {
+        const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,

@@ -9,9 +9,10 @@ interface AdminPanelProps {
   onUpdate: (newPaints: Paint[]) => void;
   isVisible: boolean;
   onClose: () => void;
+  apiKey: string;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, onClose }) => {
+const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, onClose, apiKey }) => {
   const [editablePaints, setEditablePaints] = useState<Paint[]>([]);
   const [newPaintQuery, setNewPaintQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -59,10 +60,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
       setError('登録したい塗料の名前を入力してください。');
       return;
     }
+    if (!apiKey) {
+      setError('AI機能を利用するには、まずAPIキーを設定してください。');
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      const newPaintInfo = await getNewPaintInfo(newPaintQuery, paints);
+      const newPaintInfo = await getNewPaintInfo(newPaintQuery, paints, apiKey);
       
       // Check for duplicate code
       if (editablePaints.some(p => p.code === newPaintInfo.code && newPaintInfo.code !== 'N/A')) {
@@ -123,7 +128,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
                 className="flex-grow bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 focus:ring-2 focus:ring-sky-500 focus:outline-none"
                 disabled={isLoading}
               />
-              <button onClick={handleAiAddPaint} disabled={isLoading} className="px-4 py-2 font-bold text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:bg-slate-600">
+              <button onClick={handleAiAddPaint} disabled={isLoading || !apiKey} className="px-4 py-2 font-bold text-white bg-sky-600 rounded-md hover:bg-sky-700 disabled:bg-slate-600">
                 {isLoading ? '登録中...' : 'AIで登録'}
               </button>
             </div>

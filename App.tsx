@@ -9,8 +9,10 @@ import ColorMixerModal from './components/ColorMixerModal';
 import ColorReplicator from './components/ColorReplicator';
 import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
+import ApiKeyManager from './components/ApiKeyManager';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
+const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
 
 // Helper to convert hex to RGB
 const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
@@ -82,6 +84,7 @@ const App: React.FC = () => {
   const [paints, setPaints] = useState<Paint[]>([]);
   const [layers, setLayers] = useState<PaintLayer[]>([]);
   const [baseColor, setBaseColor] = useState<string>('#808080');
+  const [apiKey, setApiKey] = useState<string>('');
   const draggedItemIndex = useRef<number | null>(null);
   const [mixerState, setMixerState] = useState<{isOpen: boolean; layerId: string | null}>({isOpen: false, layerId: null});
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -89,6 +92,11 @@ const App: React.FC = () => {
   const [isLoadingPaints, setIsLoadingPaints] = useState(true);
 
   useEffect(() => {
+    const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
+    if (storedApiKey) {
+      setApiKey(storedApiKey);
+    }
+    
     const params = new URLSearchParams(window.location.search);
     const adminParam = params.get('admin') === 'true';
     setIsAdminMode(adminParam);
@@ -137,6 +145,11 @@ const App: React.FC = () => {
               console.error("Failed to save paints to localStorage:", error);
           }
       }
+  };
+
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+    localStorage.setItem(API_KEY_STORAGE_KEY, key);
   };
 
   const addNewLayer = useCallback(() => {
@@ -262,10 +275,12 @@ const App: React.FC = () => {
           <p className="mt-2 text-slate-400">エアブラシ塗装のシミュレーション、調色、AIによる色再現レシピ生成が可能です。</p>
         </header>
 
+        <ApiKeyManager initialKey={apiKey} onSave={handleSaveApiKey} />
+        
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 flex flex-col gap-6">
             
-            <ColorReplicator onApplyRecipe={handleRecipeApply} paints={paints} />
+            <ColorReplicator onApplyRecipe={handleRecipeApply} paints={paints} apiKey={apiKey} />
 
             <div className="bg-slate-800 p-6 rounded-lg shadow-lg">
                 <h2 className="text-xl font-bold text-slate-300 mb-4">塗装レイヤー設定</h2>
@@ -308,7 +323,7 @@ const App: React.FC = () => {
           </div>
 
           <div className="lg:col-span-1">
-            <AdvicePanel layers={layers} baseColor={baseColor} paints={paints} />
+            <AdvicePanel layers={layers} baseColor={baseColor} paints={paints} apiKey={apiKey} />
           </div>
         </main>
       </div>
@@ -332,6 +347,7 @@ const App: React.FC = () => {
                 onUpdate={handlePaintsUpdate}
                 isVisible={isAdminPanelVisible}
                 onClose={() => setIsAdminPanelVisible(false)}
+                apiKey={apiKey}
             />
         </>
       )}
