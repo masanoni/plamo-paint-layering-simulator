@@ -17,9 +17,20 @@ const AdvicePanel: React.FC<AdvicePanelProps> = ({ layers, baseColor, paints, ap
   const handleGetAdvice = async () => {
     setIsLoading(true);
     setAdvice('');
-    const result = await getPaintingAdvice(baseColor, layers, paints, apiKey);
-    setAdvice(result);
-    setIsLoading(false);
+    try {
+      const stream = await getPaintingAdvice(baseColor, layers, paints, apiKey);
+      for await (const chunk of stream) {
+        setAdvice(prev => prev + chunk.text);
+      }
+    } catch (e) {
+      if (e instanceof Error) {
+        setAdvice(e.message);
+      } else {
+        setAdvice('AIからのアドバイス取得中に不明なエラーが発生しました。');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -33,7 +44,7 @@ const AdvicePanel: React.FC<AdvicePanelProps> = ({ layers, baseColor, paints, ap
         {isLoading ? 'アドバイスを生成中...' : 'AIにアドバイスをもらう'}
       </button>
       <div className="flex-grow p-4 bg-slate-900 rounded-md overflow-y-auto h-96 prose prose-invert prose-p:text-slate-300 prose-headings:text-slate-100 prose-strong:text-sky-400">
-        {isLoading && (
+        {isLoading && !advice && (
           <div className="flex justify-center items-center h-full">
             <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-sky-500"></div>
           </div>

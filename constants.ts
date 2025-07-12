@@ -9,6 +9,6 @@ export const AFFILIATE_TAGS = {
   rakuten: '4a3ed032.310b2f24.4a3ed033.d0e2c1e5',
 };
 
-// 楽天APIのアプリケーションID（APIキー）
-export const RAKUTEN_APP_ID = '183f3ee841bb41fdfeb3bb64b5132dfc824fdcc8';
+// 楽天APIのアプリケーションID（APIキー）。これはシークレットキーではありません。
+export const RAKUTEN_APP_ID = '1057026678431327616';
 // ▲▲▲ あなたのアフィリエイト情報をここに設定してください ▲▲▲

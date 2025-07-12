@@ -23,17 +23,13 @@ export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, 
  * @returns The affiliate URL of the lowest priced item, or null if not found or an error occurs.
  */
 export const findLowestPriceRakutenLink = async (keyword: string): Promise<string | null> => {
-    // Check if the user has replaced the placeholder API key
-    if (!RAKUTEN_APP_ID || RAKUTEN_APP_ID === '183f3ee841bb41fdfeb3bb64b5132dfc824fdcc8' && !window.confirm('テスト用の楽天APIキーが使用されます。このまま続行しますか？')) {
-        if(RAKUTEN_APP_ID === '183f3ee841bb41fdfeb3bb64b5132dfc824fdcc8') {
-             // Silently continue if it's the user-provided key, even if it matches the placeholder text by chance.
-        } else {
-            console.warn('Rakuten Application ID not set.');
-            return null;
-        }
+    // Check if the API keys are set.
+    if (!RAKUTEN_APP_ID) {
+        console.warn('Rakuten Application ID has not been set in constants.ts. Skipping Rakuten link generation.');
+        return null;
     }
-     if (!AFFILIATE_TAGS.rakuten || AFFILIATE_TAGS.rakuten === 'your-rakuten-id') {
-        console.warn('Rakuten Affiliate ID not set.');
+     if (!AFFILIATE_TAGS.rakuten) {
+        console.warn('Rakuten Affiliate ID has not been set in constants.ts. Skipping Rakuten link generation.');
         return null;
     }
 

@@ -85,13 +85,13 @@ const getMixDetails = (layer: PaintLayer, availablePaints: Paint[]): string => {
 };
 
 
-export const getPaintingAdvice = async (baseColor: string, layers: PaintLayer[], paints: Paint[], apiKey: string): Promise<string> => {
+export const getPaintingAdvice = async (baseColor: string, layers: PaintLayer[], paints: Paint[], apiKey: string) => {
   if (!apiKey) {
-    return "エラー: APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。";
+    throw new Error("エラー: APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
   }
 
   if (layers.length === 0) {
-    return "アドバイスを得るには、少なくとも1つ以上の塗料レイヤーを追加してください。";
+    throw new Error("アドバイスを得るには、少なくとも1つ以上の塗料レイヤーを追加してください。");
   }
 
   const layerDescriptions = layers.map((layer, index) => 
@@ -117,17 +117,17 @@ ${layerDescriptions}
 
   try {
     const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
+    const responseStream = await ai.models.generateContentStream({
         model: 'gemini-2.5-flash',
         contents: prompt,
     });
-    return response.text;
+    return responseStream;
   } catch (error) {
     console.error("Error fetching advice from Gemini API:", error);
     if (error instanceof Error) {
-        return `AIからのアドバイス取得中にエラーが発生しました: ${error.message}`;
+        throw new Error(`AIからのアドバイス取得中にエラーが発生しました: ${error.message}`);
     }
-    return "AIからのアドバイス取得中に不明なエラーが発生しました。";
+    throw new Error("AIからのアドバイス取得中に不明なエラーが発生しました。");
   }
 };
 
