@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Paint } from '../types';
 import { getNewPaintInfo } from '../services/geminiService';
 import TrashIcon from './icons/TrashIcon';
@@ -17,6 +17,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
   const [newPaintQuery, setNewPaintQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Deep copy to avoid direct mutation
@@ -46,6 +47,48 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
       linkElement.click();
       linkElement.remove();
   }
+
+  const handleImportClick = () => {
+    if (importFileInputRef.current) {
+        importFileInputRef.current.value = ''; // Allow re-selecting the same file
+        importFileInputRef.current.click();
+    }
+  };
+
+  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!window.confirm('現在の塗料データを上書きして、選択したファイルから新しいデータをインポートしますか？この操作は元に戻せません。')) {
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const text = e.target?.result;
+            if (typeof text !== 'string') {
+                throw new Error('ファイルの内容を読み取れませんでした。');
+            }
+            const newPaints = JSON.parse(text);
+
+            if (!Array.isArray(newPaints) || (newPaints.length > 0 && (typeof newPaints[0].code === 'undefined' || typeof newPaints[0].name === 'undefined' || typeof newPaints[0].hex === 'undefined'))) {
+                throw new Error('無効なpaints.jsonファイル形式です。必須のプロパティ(code, name, hex)がありません。');
+            }
+            
+            onUpdate(newPaints);
+            alert('塗料データが正常にインポートされ、アプリケーションとローカルストレージが更新されました。');
+        } catch (err) {
+            console.error('Import failed:', err);
+            const message = err instanceof Error ? err.message : 'ファイルが破損しているか、形式が正しくありません。';
+            alert(`インポートに失敗しました: ${message}`);
+        }
+    };
+    reader.onerror = () => {
+        alert('ファイルの読み込み中にエラーが発生しました。');
+    };
+    reader.readAsText(file);
+  };
 
   const handleDeletePaint = (code: string) => {
     if (window.confirm('この塗料を本当に削除しますか？この操作は元に戻せません。')) {
@@ -110,6 +153,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
         <header className="flex justify-between items-center p-4 border-b border-slate-700 flex-shrink-0">
           <h2 className="text-2xl font-bold text-indigo-400">管理者パネル</h2>
           <div className="flex items-center gap-4">
+            <input 
+                type="file" 
+                ref={importFileInputRef} 
+                onChange={handleImportFile} 
+                className="hidden" 
+                accept="application/json" 
+            />
+            <button onClick={handleImportClick} className="px-4 py-2 font-bold text-teal-300 bg-teal-800 rounded-md hover:bg-teal-700 transition-colors">設定をJSONからインポート</button>
             <button onClick={handleExport} className="px-4 py-2 font-bold text-sky-300 bg-sky-800 rounded-md hover:bg-sky-700 transition-colors">設定をJSONファイルにエクスポート</button>
             <button onClick={onClose} className="px-4 py-2 font-bold text-slate-300 bg-slate-700 rounded-md hover:bg-slate-600 transition-colors">閉じる</button>
           </div>

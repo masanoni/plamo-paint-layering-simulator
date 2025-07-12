@@ -1,5 +1,6 @@
 {
   "name": "Plamo Paint Layering Simulator",
   "description": "An application to simulate the final color result from layering different model kit paints (e.g., Creos, Gaia Notes). It also provides AI-powered painting advice.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }
