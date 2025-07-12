@@ -56,6 +56,7 @@ export const findLowestPriceRakutenLink = async (keyword: string): Promise<strin
         const data: RakutenApiResponse = await response.json();
 
         if (data.hits > 0 && data.Items.length > 0) {
+            // The itemUrl is automatically converted to an affiliate link by the API
             return data.Items[0].itemUrl;
         }
 

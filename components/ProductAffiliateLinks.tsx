@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { AFFILIATE_TAGS } from '../constants';
 import { Paint } from '../types';
@@ -16,14 +17,17 @@ const ProductAffiliateLinks: React.FC<ProductAffiliateLinksProps> = ({ products,
     const paint = paints.find(p => productName.includes(p.name) && productName.includes(p.code));
     
     let url;
-    if (paint?.amazonUrl) {
+    if (paint?.amazonUrl && paint.amazonUrl.includes('/dp/')) {
       url = new URL(paint.amazonUrl);
     } else {
       url = new URL('https://www.amazon.co.jp/s');
-      url.searchParams.set('k', productName.replace(/^- /, ''));
+      const query = productName.replace(/^- /, '');
+      url.searchParams.set('k', query);
+      // Add filters for "Sold by Amazon" and "Prime eligible" for better results
+      url.searchParams.set('rh', 'p_6:AN1VRQENFRJN5,p_76:2227292051');
     }
 
-    if (AFFILIATE_TAGS.amazon && AFFILIATE_TAGS.amazon !== 'your-amazon-tag-22') {
+    if (AFFILIATE_TAGS.amazon) {
         url.searchParams.set('tag', AFFILIATE_TAGS.amazon);
     }
     return url.toString();
@@ -32,20 +36,22 @@ const ProductAffiliateLinks: React.FC<ProductAffiliateLinksProps> = ({ products,
   const generateRakutenLink = (productName: string): string => {
       const paint = paints.find(p => productName.includes(p.name) && productName.includes(p.code));
 
+      // Priority 1: Use the specific URL from the database if it exists.
       if (paint?.rakutenUrl) {
-          return paint.rakutenUrl; // Assume Rakuten link is pre-formatted with affiliate ID if provided
+          return paint.rakutenUrl;
       }
       
+      // Fallback: Create a sorted, affiliated search link.
       const query = productName.replace(/^- /, '');
-      let url = `https://search.rakuten.co.jp/search/mall/${encodeURIComponent(query)}/`;
+      const url = new URL(`https://search.rakuten.co.jp/search/mall/${encodeURIComponent(query)}/`);
 
-      if (AFFILIATE_TAGS.rakuten && AFFILIATE_TAGS.rakuten !== 'your-rakuten-id') {
-           // This is a generic search link; specific affiliate parameter might vary.
-           // A common practice is using services like Rakuten LinkShare, but for a direct search:
-           // The most basic way is just to have the user log in. More complex integrations are possible.
-           // For now, we'll just direct to the search.
+      if (AFFILIATE_TAGS.rakuten) {
+         // Parameters for a sorted affiliate search link
+         url.searchParams.set('s', '1'); // Sort by price ascending
+         url.searchParams.set('f', 'A'); // Affiliate link format
+         url.searchParams.set('scid', `af_id:${AFFILIATE_TAGS.rakuten}`);
       }
-      return url;
+      return url.toString();
   };
 
 
@@ -79,7 +85,7 @@ const ProductAffiliateLinks: React.FC<ProductAffiliateLinksProps> = ({ products,
           </li>
         ))}
       </ul>
-       <p className="text-xs text-slate-500 mt-3">※アフィリエイトIDは管理者パネルから設定できます。</p>
+       <p className="text-xs text-slate-500 mt-3">※アフィリエイトIDはconstants.tsファイルから設定できます。</p>
     </div>
   );
 };
