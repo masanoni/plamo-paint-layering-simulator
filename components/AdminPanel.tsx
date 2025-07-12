@@ -12,6 +12,8 @@ interface AdminPanelProps {
   apiKey: string;
 }
 
+const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
+
 const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, onClose, apiKey }) => {
   const [editablePaints, setEditablePaints] = useState<Paint[]>([]);
   const [newPaintQuery, setNewPaintQuery] = useState('');
@@ -90,6 +92,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
     reader.readAsText(file);
   };
 
+  const handleSyncWithServer = () => {
+    if (window.confirm('ローカルに保存されている未エクスポートの変更はすべて破棄されます。サーバー上の最新の塗料データを読み込みますか？')) {
+        localStorage.removeItem(PAINTS_STORAGE_KEY);
+        window.location.reload();
+    }
+  };
+
   const handleDeletePaint = (code: string) => {
     if (window.confirm('この塗料を本当に削除しますか？この操作は元に戻せません。')) {
        const updated = editablePaints.filter(p => p.code !== code);
@@ -152,7 +161,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
       >
         <header className="flex justify-between items-center p-4 border-b border-slate-700 flex-shrink-0">
           <h2 className="text-2xl font-bold text-indigo-400">管理者パネル</h2>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button onClick={handleSyncWithServer} className="px-3 py-2 text-sm font-bold text-yellow-300 bg-yellow-800 rounded-md hover:bg-yellow-700 transition-colors">サーバーデータと同期</button>
             <input 
                 type="file" 
                 ref={importFileInputRef} 
@@ -160,9 +170,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
                 className="hidden" 
                 accept="application/json" 
             />
-            <button onClick={handleImportClick} className="px-4 py-2 font-bold text-teal-300 bg-teal-800 rounded-md hover:bg-teal-700 transition-colors">設定をJSONからインポート</button>
-            <button onClick={handleExport} className="px-4 py-2 font-bold text-sky-300 bg-sky-800 rounded-md hover:bg-sky-700 transition-colors">設定をJSONファイルにエクスポート</button>
-            <button onClick={onClose} className="px-4 py-2 font-bold text-slate-300 bg-slate-700 rounded-md hover:bg-slate-600 transition-colors">閉じる</button>
+            <button onClick={handleImportClick} className="px-3 py-2 text-sm font-bold text-teal-300 bg-teal-800 rounded-md hover:bg-teal-700 transition-colors">JSONからインポート</button>
+            <button onClick={handleExport} className="px-3 py-2 text-sm font-bold text-sky-300 bg-sky-800 rounded-md hover:bg-sky-700 transition-colors">JSONへエクスポート</button>
+            <button onClick={onClose} className="px-3 py-2 text-sm font-bold text-slate-300 bg-slate-700 rounded-md hover:bg-slate-600 transition-colors">閉じる</button>
           </div>
         </header>
 

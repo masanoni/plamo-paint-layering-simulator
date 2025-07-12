@@ -104,30 +104,45 @@ const App: React.FC = () => {
     const loadPaints = async () => {
         setIsLoadingPaints(true);
         try {
-            let initialPaints: Paint[] = [];
-            // First, try fetching the master JSON file
-            const response = await fetch('/paints.json');
-            if (!response.ok) {
-                throw new Error('paints.json not found or failed to load');
+            let loadedPaints: Paint[] = [];
+            // 1. 常にサーバーから最新の paints.json をフェッチする（キャッシュを無効化）
+            try {
+                const response = await fetch('/paints.json', { cache: 'no-store' });
+                if (response.ok) {
+                    loadedPaints = await response.json();
+                } else {
+                    console.error('paints.jsonの読み込みに失敗しました。');
+                    throw new Error(`Failed to load paints.json: ${response.statusText}`);
+                }
+            } catch (e) {
+                console.error('paints.jsonのフェッチ中にエラーが発生しました:', e);
+                throw e; // エラーを伝播させる
             }
-            initialPaints = await response.json();
-            
-            // If in admin mode, check localStorage and override if available
+
+            // 2. 管理者モードの場合のみ、ローカルストレージのデータで上書きする
             if (adminParam) {
-                const storedPaints = localStorage.getItem(PAINTS_STORAGE_KEY);
-                if (storedPaints) {
+                const storedPaintsJSON = localStorage.getItem(PAINTS_STORAGE_KEY);
+                if (storedPaintsJSON) {
                     try {
-                        initialPaints = JSON.parse(storedPaints);
-                        console.log("Loaded paints from localStorage (Admin Mode).");
+                        const storedPaints = JSON.parse(storedPaintsJSON);
+                        if (Array.isArray(storedPaints) && storedPaints.length > 0) {
+                            loadedPaints = storedPaints;
+                            console.log("管理者モード: ローカルストレージから編集中の塗料データを読み込みました。");
+                        }
                     } catch (e) {
-                        console.error("Failed to parse paints from localStorage, falling back to JSON file.", e);
+                        console.error("ローカルストレージの塗料データの解析に失敗しました:", e);
                     }
                 }
             }
-            setPaints(initialPaints);
+            
+            if (loadedPaints.length === 0) {
+                 throw new Error("利用可能な塗料データがありません。paints.jsonを確認してください。");
+            }
+
+            setPaints(loadedPaints);
         } catch (error) {
-            console.error("Failed to load paints:", error);
-            // Handle error, maybe show a message to the user
+            console.error("塗料データの読み込みに失敗しました:", error);
+            // エラーメッセージをユーザーに表示するなどの処理
         } finally {
             setIsLoadingPaints(false);
         }
