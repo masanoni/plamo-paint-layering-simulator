@@ -10,6 +10,7 @@ import ColorReplicator from './components/ColorReplicator';
 import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
 import ApiKeyManager from './components/ApiKeyManager';
+import initialPaints from './paints.json';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
 const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
@@ -98,7 +99,7 @@ const App: React.FC = () => {
       setApiKey(storedApiKey);
     }
     
-    const loadPaints = async () => {
+    const loadPaints = () => {
       setIsLoadingPaints(true);
       setPaintLoadingError(null);
       try {
@@ -108,6 +109,7 @@ const App: React.FC = () => {
   
           let paintsData: Paint[] | null = null;
   
+          // In admin mode, prioritize loading potentially edited paints from local storage.
           if (adminParam) {
               const storedPaintsJSON = localStorage.getItem(PAINTS_STORAGE_KEY);
               if (storedPaintsJSON) {
@@ -118,26 +120,21 @@ const App: React.FC = () => {
                           console.log("管理者モード: ローカルストレージからデータを読み込みました。");
                       }
                   } catch (e) {
-                      console.error("ローカルストレージの塗料データの解析に失敗しました。サーバーから再取得します。", e);
+                      console.error("ローカルストレージの塗料データの解析に失敗しました。デフォルトデータで初期化します。", e);
                       localStorage.removeItem(PAINTS_STORAGE_KEY); // Clear corrupted data
                   }
               }
           }
           
+          // If no data was loaded from local storage, use the statically imported data.
           if (paintsData === null) {
-              const response = await fetch('/paints.json', { cache: 'no-store' });
-              if (!response.ok) {
-                  throw new Error(`サーバーからの応答が正常ではありませんでした: ${response.status} ${response.statusText}`);
-              }
-              const serverPaints = await response.json();
-              if (!Array.isArray(serverPaints)) {
-                  throw new Error('paints.jsonの形式が正しくありません。ルート要素は配列である必要があります。');
-              }
-              paintsData = serverPaints;
-  
+              paintsData = initialPaints as Paint[];
+              console.log("静的JSONファイルから塗料データを読み込みました。");
+              
+              // If entering admin mode, populate local storage with the base data.
               if (adminParam) {
                   localStorage.setItem(PAINTS_STORAGE_KEY, JSON.stringify(paintsData));
-                  console.log("管理者モード: サーバーから最新データを取得し、ローカルストレージを初期化しました。");
+                  console.log("管理者モード: インポートされたpaints.jsonでローカルストレージを初期化しました。");
               }
           }
           
@@ -148,16 +145,16 @@ const App: React.FC = () => {
           setPaints(paintsData);
   
       } catch (error) {
-          console.error("塗料データの読み込みに失敗しました:", error);
+          console.error("塗料データの処理中にエラー:", error);
           if (error instanceof Error) {
-              setPaintLoadingError(`塗料データベースの読み込みに失敗しました。\nサーバー上の /paints.json ファイルの存在と内容を確認してください。\n\n詳細: ${error.message}`);
+              setPaintLoadingError(`塗料データベースの読み込み中にエラーが発生しました。\n\n詳細: ${error.message}`);
           } else {
                setPaintLoadingError("塗料データベースの読み込み中に不明なエラーが発生しました。");
           }
       } finally {
           setIsLoadingPaints(false);
       }
-  };
+    };
 
     loadPaints();
   }, []);
@@ -297,7 +294,7 @@ const App: React.FC = () => {
           <div className="max-w-2xl text-center bg-slate-800 p-8 rounded-lg shadow-2xl border border-red-500">
               <h1 className="text-3xl font-bold text-red-400 mb-4">アプリケーションエラー</h1>
               <p className="text-lg text-slate-300 mb-2 whitespace-pre-wrap">{paintLoadingError}</p>
-              <p className="mt-6 text-slate-400">管理者の方へ: Webサーバーのルートディレクトリに `paints.json` ファイルが正しく配置され、アクセス可能であることを確認してください。また、JSONファイルの内容が正しい形式であることもご確認ください。</p>
+              <p className="mt-6 text-slate-400">開発者の方へ: paints.jsonファイルが正しくインポートされているか、内容が正しい形式であるかをご確認ください。</p>
           </div>
       </div>
     );

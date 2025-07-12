@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { PaintLayer, Paint, PaintFinish, RecipeConditions, ParsedRecipe, PaintType, ParsedLayer, Brand, PaintSystem, FinishTypeGoal, TopCoatFinish } from '../types';
 
 
@@ -62,12 +62,6 @@ const mapTopCoatFinishJaToEn = (type: TopCoatFinish): string => {
     }
 }
 
-
-// English-only enum values for AI Schema to prevent encoding errors
-const BRAND_ENUM_EN = ['GSI Creos', 'Gaia Notes', 'Other'];
-const PAINT_TYPE_ENUM_EN = ['Normal', 'Metallic', 'Pearl', 'Clear'];
-const PAINT_SYSTEM_ENUM_EN = ['Lacquer', 'Water-based', 'Acrysion'];
-const PAINT_FINISH_ENUM_EN: PaintFinish[] = ['gloss', 'matte', 'semi-gloss', 'velvet'];
 
 const getFinishText = (finish: PaintFinish): string => {
   switch (finish) {
@@ -143,7 +137,6 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
       throw new Error("APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
   }
 
-  // 1. Normalize paint system from conditions to Japanese to filter paints.
   const paintSystemJa: PaintSystem = Object.values(PaintSystem).includes(conditions.paintSystem as PaintSystem)
       ? conditions.paintSystem as PaintSystem
       : mapPaintSystemEnToJa(conditions.paintSystem);
@@ -153,135 +146,78 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
       throw new Error(`選択された塗料系統「${paintSystemJa}」に利用可能な塗料がデータベースにありません。`);
   }
 
-  // 2. Convert all conditions and paint data to English for the AI prompt to avoid encoding errors.
   const paintSystemEn = mapPaintSystemJaToEn(paintSystemJa);
   const finishTypeEn = mapFinishTypeGoalJaToEn(conditions.finishType);
   const topCoatEn = mapTopCoatFinishJaToEn(conditions.topCoat);
 
   const simplifiedPaintsEn = filteredPaints.map(p => {
-    // REMOVED 'Name' to prevent encoding errors. The AI must use the code. Added HEX for color reference.
+    // Japanese names are removed from the prompt to prevent encoding errors.
+    // The AI can identify paints by code and look up the name for the output.
     return `- Brand: ${mapBrandJaToEn(p.brand)}, Code: ${p.code}, Type: ${mapPaintTypeJaToEn(p.type)}, Finish: ${p.finish || 'gloss'}, HEX: ${p.hex}`;
   }).join('\n');
 
-  const recipeSchema = {
-    type: Type.OBJECT,
-    properties: {
-        baseColorHex: {
-            type: Type.STRING,
-            description: "The proposed base color in HEX code format.",
-        },
-        layers: {
-            type: Type.ARRAY,
-            description: "The main paint layers, applied in order from bottom to top.",
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    coats: { type: Type.INTEGER, description: "Estimated number of coats (1-10)." },
-                    type: { type: Type.STRING, enum: PAINT_TYPE_ENUM_EN, description: "The paint type for the layer. Use English values." },
-                    paintSystem: { type: Type.STRING, enum: PAINT_SYSTEM_ENUM_EN, description: "The paint system for the layer. Use English values. Must match the user's specified system." },
-                    finish: { type: Type.STRING, enum: PAINT_FINISH_ENUM_EN, description: "The paint finish for the layer." },
-                    mixData: {
-                        type: Type.OBJECT,
-                        properties: {
-                            paints: {
-                                type: Type.ARRAY,
-                                items: {
-                                    type: Type.OBJECT,
-                                    properties: {
-                                        code: { type: Type.STRING, description: "Product code from the available paints list." },
-                                        ratio: { type: Type.INTEGER, description: "Mixing ratio (%). Should be adjusted to total 100%." }
-                                    },
-                                    required: ["code", "ratio"]
-                                }
-                            }
-                        },
-                         required: ["paints"]
-                    }
-                },
-                required: ["coats", "type", "paintSystem", "finish", "mixData"]
-            }
-        },
-        topCoat: {
-            type: Type.OBJECT,
-            description: "The final top coat layer. Null if not needed.",
-            nullable: true,
-            properties: {
-                coats: { type: Type.INTEGER, description: "Estimated number of coats (1-10)." },
-                type: { type: Type.STRING, enum: ['Clear'], description: "Top coat must be a 'Clear' type." },
-                paintSystem: { type: Type.STRING, enum: PAINT_SYSTEM_ENUM_EN, description: "The paint system for the top coat. Use English values. Must match the user's specified system." },
-                finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss'], description: "The user-specified finish for the top coat." },
-                mixData: {
-                    type: Type.OBJECT,
-                    properties: {
-                         paints: {
-                            type: Type.ARRAY,
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    code: { type: Type.STRING, description: "Product code from the available paints list." },
-                                    ratio: { type: Type.INTEGER, description: "Used as a single paint (100%)." }
-                                },
-                                required: ["code", "ratio"]
-                            }
-                        }
-                    },
-                    required: ["paints"]
-                }
-            },
-             required: ["coats", "type", "paintSystem", "finish", "mixData"]
-        },
-        products: {
-            type: Type.ARRAY,
-            description: "A list of all product names used in the recipe (e.g., 'GSIクレオス Mr.カラー ホワイト (C1)'). Infer the full Japanese name from the code.",
-            items: { type: Type.STRING }
-        },
-        recipeText: {
-            type: Type.STRING,
-            description: "A detailed step-by-step painting instruction guide in JAPANESE for human readers. Use newlines appropriately, no HTML tags."
-        }
-    },
-    required: ["baseColorHex", "layers", "topCoat", "products", "recipeText"]
-  };
-
   const prompt = `
-You are a world-class professional model painter with deep knowledge of paint mixing and layering.
-A user wants to replicate a specific color (HEX: ${targetColor}) under the following conditions.
-From the provided list of available paints, create a concrete painting recipe to achieve this goal.
-Your output must strictly follow the specified JSON schema.
+You are a world-class professional model painter. A user wants to replicate a specific color. Your task is to generate a JSON object containing a painting recipe.
 
+**Your response MUST be ONLY a JSON object enclosed in a single markdown code block (\`\`\`json ... \`\`\`). Do not add any text before or after the JSON block.**
+
+The JSON object must have the following structure:
+{
+  "baseColorHex": "string (The proposed base color in HEX code format.)",
+  "layers": [
+    {
+      "coats": "integer (Estimated number of coats, 1-10)",
+      "type": "string (Enum: 'Normal', 'Metallic', 'Pearl', 'Clear')",
+      "paintSystem": "string (Enum: 'Lacquer', 'Water-based', 'Acrysion'. Must match the user's specified system.)",
+      "finish": "string (Enum: 'gloss', 'matte', 'semi-gloss', 'velvet')",
+      "mixData": {
+        "paints": [
+          {
+            "code": "string (Product code from the available paints list.)",
+            "ratio": "integer (Mixing ratio %.)"
+          }
+        ]
+      }
+    }
+  ],
+  "topCoat": { /* same structure as a layer object, or null if not needed */ },
+  "products": [
+    "string (A list of all product names used in the recipe in Japanese, e.g., 'GSIクレオス Mr.カラー ホワイト (C1)')."
+  ],
+  "recipeText": "string (A detailed step-by-step painting instruction guide in Japanese.)"
+}
+
+---
 # Target Color
 - HEX: ${targetColor}
 
 # User's Desired Conditions
-- User-specified Base Coat: "${conditions.baseCoat || 'Not specified'}" (This is a user input, interpret it as a modeler would, e.g., 'black surfacer', 'silver undercoat').
+- User-specified Base Coat: "${conditions.baseCoat || 'Not specified'}"
 - Desired Finish Type: ${finishTypeEn}
 - Top Coat Finish: ${topCoatEn}
-- **Paint System to Use: ${paintSystemEn}** (You must only use paints from this system.)
+- Paint System to Use: ${paintSystemEn}
 
-# Your Available Paint List (Only from the specified "${paintSystemEn}" system)
+# Your Available Paint List (For "${paintSystemEn}" system)
 ${simplifiedPaintsEn}
+---
 
-# Instructions
-1.  **Formulate Recipe**: Prioritizing the user's conditions, create the most effective recipe to replicate the target color and texture. Use the provided paint list.
-2.  **JSON Output**: Strictly structure the recipe as a JSON object according to the provided schema.
-    - 'mixData' must accurately contain the 'code' and 'ratio' for the paints used.
-    - 'paintSystem' and 'type' fields must use the English enum values from the schema.
-    - In the 'products' field, list the full, original Japanese names of the products used (e.g., 'GSIクレオス Mr.カラー ホワイト (C1)'). You can infer the name from the code by matching it to the available paints list you were given.
-3.  **Create Description in Japanese**: In the 'recipeText' field, provide a step-by-step guide in **JAPANESE** for a human reader. Explain professionally yet simply why you chose this recipe, key points for each step, and any precautions.
+Now, generate the JSON object based on these instructions.
 `;
 
   try {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: recipeSchema,
-        },
+        contents: prompt
       });
       
-      const rawResult = JSON.parse(response.text.trim());
+      let jsonString = response.text;
+      const match = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
+      if (match && match[1]) {
+          jsonString = match[1];
+      }
+      
+      const rawResult = JSON.parse(jsonString.trim());
 
       const mapLayer = (layer: any): ParsedLayer | null => {
           if (!layer) return null;
@@ -315,43 +251,47 @@ export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: P
 
     const existingPaintCodes = availablePaints.map(p => p.code).join(', ');
 
-    const paintInfoSchema = {
-        type: Type.OBJECT,
-        properties: {
-            brand: { type: Type.STRING, enum: BRAND_ENUM_EN, description: "Paint brand name (e.g., 'GSI Creos')." },
-            series: { type: Type.STRING, description: "Product series name (e.g., Mr.Color GX, Aqueous Hobby Color). Null if not applicable.", nullable: true },
-            name: { type: Type.STRING, description: "Official product name of the paint (e.g., Cool White, Ex-Clear)." },
-            code: { type: Type.STRING, description: "Product code (e.g., GX1, H1, N1). 'N/A' if unknown." },
-            hex: { type: Type.STRING, description: "HEX code representing the paint color (e.g., #ffffff). Use #ffffff for clear paints." },
-            type: { type: Type.STRING, enum: PAINT_TYPE_ENUM_EN, description: "The type of paint. Use English values (e.g., 'Normal')." },
-            paintSystem: { type: Type.STRING, enum: PAINT_SYSTEM_ENUM_EN, description: "The paint system. Use English values (e.g., 'Lacquer')." },
-            finish: { type: Type.STRING, enum: PAINT_FINISH_ENUM_EN, description: "The default finish of the paint (gloss, matte, semi-gloss, velvet)." },
-        },
-        required: ["brand", "series", "name", "code", "hex", "type", "paintSystem", "finish"]
-    };
-
     const prompt = `
-    You are an expert paint database assistant. A user wants to find detailed information for a paint with the following query: "${paintNameQuery}".
-    Search the internet for the most accurate information and return it as a JSON object that strictly follows the provided schema.
-    Accuracy for 'code', 'hex', and 'paintSystem' is critical.
+You are an expert paint database assistant. A user wants to find detailed information for a paint.
+Your response MUST be ONLY a JSON object enclosed in a single markdown code block (\`\`\`json ... \`\`\`). Do not add any text before or after the JSON block.
 
-    Important: The product 'code' you find must NOT be in the following list of existing codes: ${existingPaintCodes}
+The JSON object must have the following structure:
+{
+    "brand": "string (Enum: 'GSI Creos', 'Gaia Notes', 'Other')",
+    "series": "string (Product series name in Japanese, e.g., 'Mr.カラーGX'. Null if not applicable.)",
+    "name": "string (Official product name in Japanese, e.g., 'クールホワイト')",
+    "code": "string (Product code, e.g., 'GX1'. 'N/A' if unknown. Must not be in the list of existing codes below.)",
+    "hex": "string (HEX code for the color, e.g., '#f8f8f8')",
+    "type": "string (Enum: 'Normal', 'Metallic', 'Pearl', 'Clear')",
+    "paintSystem": "string (Enum: 'Lacquer', 'Water-based', 'Acrysion')",
+    "finish": "string (Enum: 'gloss', 'matte', 'semi-gloss', 'velvet')"
+}
 
-    Another important point: For the 'brand', 'type', and 'paintSystem' fields in the JSON output, you MUST use the English keywords defined in the schema (e.g., 'GSI Creos', 'Normal', 'Lacquer'). However, the 'name' and 'series' fields should be the official JAPANESE names if they exist.
-    `;
+---
+# User Query
+"${paintNameQuery}"
+
+# Existing Product Codes (Do not use these)
+${existingPaintCodes}
+---
+
+Search the internet for the most accurate information for the user's query and generate the JSON object.
+`;
 
     try {
         const ai = new GoogleGenAI({ apiKey });
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: paintInfoSchema,
-            },
         });
         
-        const rawPaintInfo = JSON.parse(response.text.trim());
+        let jsonString = response.text;
+        const match = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+            jsonString = match[1];
+        }
+
+        const rawPaintInfo = JSON.parse(jsonString.trim());
 
         const paintInfo = {
             ...rawPaintInfo,
