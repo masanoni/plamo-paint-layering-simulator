@@ -90,6 +90,7 @@ const App: React.FC = () => {
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isAdminPanelVisible, setIsAdminPanelVisible] = useState(false);
   const [isLoadingPaints, setIsLoadingPaints] = useState(true);
+  const [paintLoadingError, setPaintLoadingError] = useState<string | null>(null);
 
   useEffect(() => {
     const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
@@ -97,56 +98,66 @@ const App: React.FC = () => {
       setApiKey(storedApiKey);
     }
     
-    const params = new URLSearchParams(window.location.search);
-    const adminParam = params.get('admin') === 'true';
-    setIsAdminMode(adminParam);
-
     const loadPaints = async () => {
-        setIsLoadingPaints(true);
-        try {
-            let loadedPaints: Paint[] = [];
-            // 1. 常にサーバーから最新の paints.json をフェッチする（キャッシュを無効化）
-            try {
-                const response = await fetch('/paints.json', { cache: 'no-store' });
-                if (response.ok) {
-                    loadedPaints = await response.json();
-                } else {
-                    console.error('paints.jsonの読み込みに失敗しました。');
-                    throw new Error(`Failed to load paints.json: ${response.statusText}`);
-                }
-            } catch (e) {
-                console.error('paints.jsonのフェッチ中にエラーが発生しました:', e);
-                throw e; // エラーを伝播させる
-            }
-
-            // 2. 管理者モードの場合のみ、ローカルストレージのデータで上書きする
-            if (adminParam) {
-                const storedPaintsJSON = localStorage.getItem(PAINTS_STORAGE_KEY);
-                if (storedPaintsJSON) {
-                    try {
-                        const storedPaints = JSON.parse(storedPaintsJSON);
-                        if (Array.isArray(storedPaints) && storedPaints.length > 0) {
-                            loadedPaints = storedPaints;
-                            console.log("管理者モード: ローカルストレージから編集中の塗料データを読み込みました。");
-                        }
-                    } catch (e) {
-                        console.error("ローカルストレージの塗料データの解析に失敗しました:", e);
-                    }
-                }
-            }
-            
-            if (loadedPaints.length === 0) {
-                 throw new Error("利用可能な塗料データがありません。paints.jsonを確認してください。");
-            }
-
-            setPaints(loadedPaints);
-        } catch (error) {
-            console.error("塗料データの読み込みに失敗しました:", error);
-            // エラーメッセージをユーザーに表示するなどの処理
-        } finally {
-            setIsLoadingPaints(false);
-        }
-    };
+      setIsLoadingPaints(true);
+      setPaintLoadingError(null);
+      try {
+          const params = new URLSearchParams(window.location.search);
+          const adminParam = params.get('admin') === 'true';
+          setIsAdminMode(adminParam);
+  
+          let paintsData: Paint[] | null = null;
+  
+          if (adminParam) {
+              const storedPaintsJSON = localStorage.getItem(PAINTS_STORAGE_KEY);
+              if (storedPaintsJSON) {
+                  try {
+                      const storedPaints = JSON.parse(storedPaintsJSON);
+                      if (Array.isArray(storedPaints) && storedPaints.length > 0) {
+                          paintsData = storedPaints;
+                          console.log("管理者モード: ローカルストレージからデータを読み込みました。");
+                      }
+                  } catch (e) {
+                      console.error("ローカルストレージの塗料データの解析に失敗しました。サーバーから再取得します。", e);
+                      localStorage.removeItem(PAINTS_STORAGE_KEY); // Clear corrupted data
+                  }
+              }
+          }
+          
+          if (paintsData === null) {
+              const response = await fetch('/paints.json', { cache: 'no-store' });
+              if (!response.ok) {
+                  throw new Error(`サーバーからの応答が正常ではありませんでした: ${response.status} ${response.statusText}`);
+              }
+              const serverPaints = await response.json();
+              if (!Array.isArray(serverPaints)) {
+                  throw new Error('paints.jsonの形式が正しくありません。ルート要素は配列である必要があります。');
+              }
+              paintsData = serverPaints;
+  
+              if (adminParam) {
+                  localStorage.setItem(PAINTS_STORAGE_KEY, JSON.stringify(paintsData));
+                  console.log("管理者モード: サーバーから最新データを取得し、ローカルストレージを初期化しました。");
+              }
+          }
+          
+          if (!paintsData || paintsData.length === 0) {
+               throw new Error("利用可能な塗料データが見つかりませんでした。paints.jsonファイルが空か、正しくありません。");
+          }
+  
+          setPaints(paintsData);
+  
+      } catch (error) {
+          console.error("塗料データの読み込みに失敗しました:", error);
+          if (error instanceof Error) {
+              setPaintLoadingError(`塗料データベースの読み込みに失敗しました。\nサーバー上の /paints.json ファイルの存在と内容を確認してください。\n\n詳細: ${error.message}`);
+          } else {
+               setPaintLoadingError("塗料データベースの読み込み中に不明なエラーが発生しました。");
+          }
+      } finally {
+          setIsLoadingPaints(false);
+      }
+  };
 
     loadPaints();
   }, []);
@@ -278,6 +289,18 @@ const App: React.FC = () => {
               <p className="ml-4 text-xl">塗料データベースを読み込み中...</p>
           </div>
       );
+  }
+
+  if (paintLoadingError) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white p-4">
+          <div className="max-w-2xl text-center bg-slate-800 p-8 rounded-lg shadow-2xl border border-red-500">
+              <h1 className="text-3xl font-bold text-red-400 mb-4">アプリケーションエラー</h1>
+              <p className="text-lg text-slate-300 mb-2 whitespace-pre-wrap">{paintLoadingError}</p>
+              <p className="mt-6 text-slate-400">管理者の方へ: Webサーバーのルートディレクトリに `paints.json` ファイルが正しく配置され、アクセス可能であることを確認してください。また、JSONファイルの内容が正しい形式であることもご確認ください。</p>
+          </div>
+      </div>
+    );
   }
 
   return (
