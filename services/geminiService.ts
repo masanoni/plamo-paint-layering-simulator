@@ -159,7 +159,8 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
   const topCoatEn = mapTopCoatFinishJaToEn(conditions.topCoat);
 
   const simplifiedPaintsEn = filteredPaints.map(p => {
-    return `- Brand: ${mapBrandJaToEn(p.brand)}, Name: ${p.name}, Code: ${p.code}, Type: ${mapPaintTypeJaToEn(p.type)}, Finish: ${p.finish || 'gloss'}`;
+    // REMOVED 'Name' to prevent encoding errors. The AI must use the code. Added HEX for color reference.
+    return `- Brand: ${mapBrandJaToEn(p.brand)}, Code: ${p.code}, Type: ${mapPaintTypeJaToEn(p.type)}, Finish: ${p.finish || 'gloss'}, HEX: ${p.hex}`;
   }).join('\n');
 
   const recipeSchema = {
@@ -231,7 +232,7 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
         },
         products: {
             type: Type.ARRAY,
-            description: "A list of all product names used in the recipe (e.g., GSI Creos Aqueous Hobby Color White (H1)).",
+            description: "A list of all product names used in the recipe (e.g., 'GSIクレオス Mr.カラー ホワイト (C1)'). Infer the full Japanese name from the code.",
             items: { type: Type.STRING }
         },
         recipeText: {
@@ -249,10 +250,10 @@ From the provided list of available paints, create a concrete painting recipe to
 Your output must strictly follow the specified JSON schema.
 
 # Target Color
-HEX: ${targetColor}
+- HEX: ${targetColor}
 
 # User's Desired Conditions
-- Base Coat: ${conditions.baseCoat || 'Not specified'}
+- User-specified Base Coat: "${conditions.baseCoat || 'Not specified'}" (This is a user input, interpret it as a modeler would, e.g., 'black surfacer', 'silver undercoat').
 - Desired Finish Type: ${finishTypeEn}
 - Top Coat Finish: ${topCoatEn}
 - **Paint System to Use: ${paintSystemEn}** (You must only use paints from this system.)
@@ -261,12 +262,12 @@ HEX: ${targetColor}
 ${simplifiedPaintsEn}
 
 # Instructions
-1.  **Formulate Recipe**: Prioritizing the user's conditions, create the most effective recipe to replicate the target color and texture. Consider everything from the base coat, each main paint layer (including mixing ratios if needed), to the final top coat.
+1.  **Formulate Recipe**: Prioritizing the user's conditions, create the most effective recipe to replicate the target color and texture. Use the provided paint list.
 2.  **JSON Output**: Strictly structure the recipe as a JSON object according to the provided schema.
     - 'mixData' must accurately contain the 'code' and 'ratio' for the paints used.
-    - **Crucially**: For the 'paintSystem' field, use the corresponding English value for the user-specified system, which is "${paintSystemEn}".
-    - **Crucially**: For the 'type' field, also use the English values defined in the schema (e.g., 'Normal', 'Metallic').
-3.  **Create Description**: In the 'recipeText' field, provide a step-by-step guide in **JAPANESE** for a human reader. Explain professionally yet simply why you chose this recipe, key points for each step, and any precautions.
+    - 'paintSystem' and 'type' fields must use the English enum values from the schema.
+    - In the 'products' field, list the full, original Japanese names of the products used (e.g., 'GSIクレオス Mr.カラー ホワイト (C1)'). You can infer the name from the code by matching it to the available paints list you were given.
+3.  **Create Description in Japanese**: In the 'recipeText' field, provide a step-by-step guide in **JAPANESE** for a human reader. Explain professionally yet simply why you chose this recipe, key points for each step, and any precautions.
 `;
 
   try {
@@ -312,7 +313,7 @@ export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: P
         throw new Error("APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
     }
 
-    const simplifiedPaints = availablePaints.map(p => `${p.name} (${p.code})`).join(', ');
+    const existingPaintCodes = availablePaints.map(p => p.code).join(', ');
 
     const paintInfoSchema = {
         type: Type.OBJECT,
@@ -330,13 +331,13 @@ export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: P
     };
 
     const prompt = `
-    あなたは塗料データベースのエキスパートです。ユーザーが入力した塗料名「${paintNameQuery}」について、その詳細情報を調べて、指定されたJSONスキーマに従って出力してください。
-    インターネット上の情報を検索し、最も正確な情報を返してください。特に製品コード、HEX値、塗料系統は正確性が重要です。
-    ただし、既存の塗料リストにある製品コードと重複しないようにしてください。
+    You are an expert paint database assistant. A user wants to find detailed information for a paint with the following query: "${paintNameQuery}".
+    Search the internet for the most accurate information and return it as a JSON object that strictly follows the provided schema.
+    Accuracy for 'code', 'hex', and 'paintSystem' is critical.
 
-    既存の塗料リスト: ${simplifiedPaints}
+    Important: The product 'code' you find must NOT be in the following list of existing codes: ${existingPaintCodes}
 
-    重要: JSONを出力する際、'brand', 'type', 'paintSystem' の各フィールドには、スキーマで定義されている英語のキーワード（例: 'GSI Creos', 'Normal', 'Lacquer'）を必ず使用してください。
+    Another important point: For the 'brand', 'type', and 'paintSystem' fields in the JSON output, you MUST use the English keywords defined in the schema (e.g., 'GSI Creos', 'Normal', 'Lacquer'). However, the 'name' and 'series' fields should be the official JAPANESE names if they exist.
     `;
 
     try {
