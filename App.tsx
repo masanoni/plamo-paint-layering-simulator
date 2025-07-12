@@ -1,17 +1,17 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Brand, PaintLayer, PaintType, MixedPaintInfo, ParsedRecipe, ParsedLayer, Paint, PaintSystem, SavedProject } from './types';
-import LayerItem from './components/LayerItem';
-import ColorDisplay from './components/ColorDisplay';
-import AdvicePanel from './components/AdvicePanel';
-import PlusIcon from './components/icons/PlusIcon';
-import ColorMixerModal from './components/ColorMixerModal';
-import ColorReplicator from './components/ColorReplicator';
-import AdminPanel from './components/AdminPanel';
-import AdminIcon from './components/icons/AdminIcon';
-import ApiKeyManager from './components/ApiKeyManager';
-import ProjectManager from './components/ProjectManager';
-import Footer from './components/Footer';
+import LayerItem from './src/components/LayerItem';
+import ColorDisplay from './src/components/ColorDisplay';
+import AdvicePanel from './src/components/AdvicePanel';
+import PlusIcon from './src/components/icons/PlusIcon';
+import ColorMixerModal from './src/components/ColorMixerModal';
+import ColorReplicator from './src/components/ColorReplicator';
+import AdminPanel from './src/components/AdminPanel';
+import AdminIcon from './src/components/icons/AdminIcon';
+import ApiKeyManager from './src/components/ApiKeyManager';
+import ProjectManager from './src/components/ProjectManager';
+import Footer from './src/components/Footer';
 import { initialPaints as defaultPaints } from './paintsData';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
