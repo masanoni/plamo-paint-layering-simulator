@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
-import { PaintLayer, Paint, PaintFinish, RecipeConditions, ParsedRecipe, PaintType, ParsedLayer, Brand, PaintSystem } from '../types';
+import { PaintLayer, Paint, PaintFinish, RecipeConditions, ParsedRecipe, PaintType, ParsedLayer, Brand, PaintSystem, FinishTypeGoal, TopCoatFinish } from '../types';
 
 
 // --- Mappings and Enums for AI Communication ---
@@ -24,6 +24,44 @@ const mapPaintSystemEnToJa = (system: string): PaintSystem => {
     if (system === 'Acrysion') return PaintSystem.ACRYSION;
     return PaintSystem.LACQUER; // Fallback
 };
+
+// Mappings from Japanese to English for AI prompt
+const mapPaintSystemJaToEn = (system: PaintSystem): string => {
+    if (system === PaintSystem.LACQUER) return 'Lacquer';
+    if (system === PaintSystem.WATER_BASED) return 'Water-based';
+    if (system === PaintSystem.ACRYSION) return 'Acrysion';
+    return 'Lacquer';
+};
+const mapBrandJaToEn = (brand: Brand): string => {
+    if (brand === Brand.CREOS) return 'GSI Creos';
+    if (brand === Brand.GAIA) return 'Gaia Notes';
+    return 'Other';
+};
+const mapPaintTypeJaToEn = (type: PaintType): string => {
+    if (type === PaintType.NORMAL) return 'Normal';
+    if (type === PaintType.METALLIC) return 'Metallic';
+    if (type === PaintType.PEARL) return 'Pearl';
+    if (type === PaintType.CLEAR) return 'Clear';
+    return 'Normal';
+};
+const mapFinishTypeGoalJaToEn = (type: FinishTypeGoal): string => {
+    switch (type) {
+        case '通常': return 'Normal Finish';
+        case 'メタリック': return 'Metallic Finish';
+        case 'キャンディ': return 'Candy Finish';
+        case '偏光塗装': return 'Prismatic/Color-shift Finish';
+        default: return type;
+    }
+}
+const mapTopCoatFinishJaToEn = (type: TopCoatFinish): string => {
+    switch (type) {
+        case '光沢': return 'Gloss';
+        case '半光沢': return 'Semi-gloss';
+        case 'つや消し': return 'Matte';
+        default: return type;
+    }
+}
+
 
 // English-only enum values for AI Schema to prevent encoding errors
 const BRAND_ENUM_EN = ['GSI Creos', 'Gaia Notes', 'Other'];
@@ -105,32 +143,24 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
       throw new Error("APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
   }
 
-  // 1. Normalize the paint system from conditions to Japanese.
-  // This handles cases where the input might be English ('Acrysion') or Japanese ('アクリジョン').
-  let paintSystemJa: PaintSystem;
-  if (Object.values(PaintSystem).includes(conditions.paintSystem as PaintSystem)) {
-      paintSystemJa = conditions.paintSystem as PaintSystem;
-  } else {
-      // Assume it's an English value that needs mapping.
-      paintSystemJa = mapPaintSystemEnToJa(conditions.paintSystem);
-  }
+  // 1. Normalize paint system from conditions to Japanese to filter paints.
+  const paintSystemJa: PaintSystem = Object.values(PaintSystem).includes(conditions.paintSystem as PaintSystem)
+      ? conditions.paintSystem as PaintSystem
+      : mapPaintSystemEnToJa(conditions.paintSystem);
 
-  // 2. Filter paints using the normalized Japanese paint system name.
   const filteredPaints = paints.filter(p => p.paintSystem === paintSystemJa);
   if (filteredPaints.length === 0) {
       throw new Error(`選択された塗料系統「${paintSystemJa}」に利用可能な塗料がデータベースにありません。`);
   }
-  
-  // 3. Create English version for the AI prompt schema.
-  const mapPaintSystemJaToEn = (system: PaintSystem): string => {
-      if (system === PaintSystem.LACQUER) return 'Lacquer';
-      if (system === PaintSystem.WATER_BASED) return 'Water-based';
-      if (system === PaintSystem.ACRYSION) return 'Acrysion';
-      return 'Lacquer';
-  };
-  const paintSystemEn = mapPaintSystemJaToEn(paintSystemJa);
 
-  const simplifiedPaints = filteredPaints.map(p => `- ${p.brand} ${p.series ? `(${p.series})` : ''} ${p.name} (${p.code}) [種類: ${p.type}, 仕上がり: ${getFinishText(p.finish || 'gloss')}]`).join('\n');
+  // 2. Convert all conditions and paint data to English for the AI prompt to avoid encoding errors.
+  const paintSystemEn = mapPaintSystemJaToEn(paintSystemJa);
+  const finishTypeEn = mapFinishTypeGoalJaToEn(conditions.finishType);
+  const topCoatEn = mapTopCoatFinishJaToEn(conditions.topCoat);
+
+  const simplifiedPaintsEn = filteredPaints.map(p => {
+    return `- Brand: ${mapBrandJaToEn(p.brand)}, Name: ${p.name}, Code: ${p.code}, Type: ${mapPaintTypeJaToEn(p.type)}, Finish: ${p.finish || 'gloss'}`;
+  }).join('\n');
 
   const recipeSchema = {
     type: Type.OBJECT,
@@ -176,7 +206,7 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
             nullable: true,
             properties: {
                 coats: { type: Type.INTEGER, description: "Estimated number of coats (1-10)." },
-                type: { type: Type.STRING, enum: [PaintType.CLEAR], description: "Top coat must be a 'Clear' type." },
+                type: { type: Type.STRING, enum: ['Clear'], description: "Top coat must be a 'Clear' type." },
                 paintSystem: { type: Type.STRING, enum: PAINT_SYSTEM_ENUM_EN, description: "The paint system for the top coat. Use English values. Must match the user's specified system." },
                 finish: { type: Type.STRING, enum: ['gloss', 'matte', 'semi-gloss'], description: "The user-specified finish for the top coat." },
                 mixData: {
@@ -206,37 +236,37 @@ export const getReplicationRecipe = async (targetColor: string, conditions: Reci
         },
         recipeText: {
             type: Type.STRING,
-            description: "A detailed step-by-step painting instruction guide in Japanese for human readers. Use newlines appropriately, no HTML tags."
+            description: "A detailed step-by-step painting instruction guide in JAPANESE for human readers. Use newlines appropriately, no HTML tags."
         }
     },
     required: ["baseColorHex", "layers", "topCoat", "products", "recipeText"]
   };
 
   const prompt = `
-あなたは世界クラスのプロモデラーで、塗料の調色と重ね塗りに関する深い知識を持っています。
-ユーザーが画像から特定の色（HEX: ${targetColor}）を、以下の条件で再現したいと考えています。
-あなたが利用可能な塗料リストの中から最適なものを選択・調色し、この目標を達成するための具体的な塗装レシピを考案してください。
-出力は、必ず指定されたJSONスキーマに従ってください。
+You are a world-class professional model painter with deep knowledge of paint mixing and layering.
+A user wants to replicate a specific color (HEX: ${targetColor}) under the following conditions.
+From the provided list of available paints, create a concrete painting recipe to achieve this goal.
+Your output must strictly follow the specified JSON schema.
 
-# 目標の色
+# Target Color
 HEX: ${targetColor}
 
-# ユーザーの希望条件
-- 下地: ${conditions.baseCoat || '指定なし'}
-- 仕上がりの種類: ${conditions.finishType}
-- トップコート: ${conditions.topCoat}
-- **使用する塗料系統: ${paintSystemJa}** (この系統の塗料のみを使用してください)
+# User's Desired Conditions
+- Base Coat: ${conditions.baseCoat || 'Not specified'}
+- Desired Finish Type: ${finishTypeEn}
+- Top Coat Finish: ${topCoatEn}
+- **Paint System to Use: ${paintSystemEn}** (You must only use paints from this system.)
 
-# あなたが利用可能な塗料リスト (指定された「${paintSystemJa}」系統のみ)
-${simplifiedPaints}
+# Your Available Paint List (Only from the specified "${paintSystemEn}" system)
+${simplifiedPaintsEn}
 
-# 指示
-1. **レシピの考案**: ユーザーの希望条件を最優先し、目標の色と質感を再現する最も効果的なレシピを構築してください。下地の色から始まり、本塗装の各レイヤー（調色が必要な場合はその比率も）、そして最終的なトップコートまでを考慮します。
-2. **JSON出力**: 考案したレシピを、指定されたJSONスキーマに厳密に従って構造化データとして出力してください。
-   - 'mixData'には、使用する塗料の'code'と'ratio'を正確に含めてください。
-   - **重要**: 'paintSystem'フィールドには、ユーザーが指定した系統に対応する英語の値、つまり「${paintSystemEn}」を使用してください。
-   - **重要**: 'type'フィールドにも、スキーマで定義されている英語の値（例: 'Normal', 'Metallic'）を使用してください。
-3. **解説文の作成**: 'recipeText'には、なぜそのレシピを提案したのか、各工程のポイント、注意点などを、専門的かつ初心者にも分かりやすく解説してください。
+# Instructions
+1.  **Formulate Recipe**: Prioritizing the user's conditions, create the most effective recipe to replicate the target color and texture. Consider everything from the base coat, each main paint layer (including mixing ratios if needed), to the final top coat.
+2.  **JSON Output**: Strictly structure the recipe as a JSON object according to the provided schema.
+    - 'mixData' must accurately contain the 'code' and 'ratio' for the paints used.
+    - **Crucially**: For the 'paintSystem' field, use the corresponding English value for the user-specified system, which is "${paintSystemEn}".
+    - **Crucially**: For the 'type' field, also use the English values defined in the schema (e.g., 'Normal', 'Metallic').
+3.  **Create Description**: In the 'recipeText' field, provide a step-by-step guide in **JAPANESE** for a human reader. Explain professionally yet simply why you chose this recipe, key points for each step, and any precautions.
 `;
 
   try {
@@ -263,7 +293,7 @@ ${simplifiedPaints}
 
       const parsedResult: ParsedRecipe = {
           ...rawResult,
-          layers: rawResult.layers.map(mapLayer).filter(Boolean),
+          layers: rawResult.layers.map(mapLayer).filter((l): l is ParsedLayer => l !== null),
           topCoat: mapLayer(rawResult.topCoat),
       };
 
