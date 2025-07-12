@@ -10,7 +10,6 @@ import ColorReplicator from './components/ColorReplicator';
 import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
 import ApiKeyManager from './components/ApiKeyManager';
-import initialPaints from './paints.json';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
 const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
@@ -99,7 +98,7 @@ const App: React.FC = () => {
       setApiKey(storedApiKey);
     }
     
-    const loadPaints = () => {
+    const loadPaints = async () => {
       setIsLoadingPaints(true);
       setPaintLoadingError(null);
       try {
@@ -126,9 +125,14 @@ const App: React.FC = () => {
               }
           }
           
-          // If no data was loaded from local storage, use the statically imported data.
+          // If no data was loaded from local storage, use fetch to get the base data.
           if (paintsData === null) {
-              paintsData = initialPaints as Paint[];
+              const response = await fetch('./paints.json');
+              if (!response.ok) {
+                  throw new Error(`Failed to fetch paints.json: ${response.statusText}`);
+              }
+              const initialPaints = await response.json() as Paint[];
+              paintsData = initialPaints;
               console.log("静的JSONファイルから塗料データを読み込みました。");
               
               // If entering admin mode, populate local storage with the base data.
