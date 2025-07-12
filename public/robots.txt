@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://chimerical-caramel-48ed3f.netlify.app/sitemap.xml

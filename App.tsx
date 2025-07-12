@@ -11,7 +11,6 @@ import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
 import ApiKeyManager from './components/ApiKeyManager';
 import ProjectManager from './components/ProjectManager';
-import Footer from './components/Footer';
 import { initialPaints as defaultPaints } from './paintsData';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
@@ -445,7 +444,6 @@ const App: React.FC = () => {
             />
         </>
       )}
-      <Footer />
     </div>
   );
 };
