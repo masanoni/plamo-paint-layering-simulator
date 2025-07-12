@@ -39,32 +39,51 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
     );
   };
   
-  const generateAmazonSearchLink = (productName: string): string => {
-    const amazonUrl = new URL('https://www.amazon.co.jp/s');
-    amazonUrl.searchParams.set('k', productName);
-    if (AFFILIATE_TAGS.amazon && AFFILIATE_TAGS.amazon !== 'your-amazon-tag-22') {
-      amazonUrl.searchParams.set('tag', AFFILIATE_TAGS.amazon);
+  const generateAmazonLink = (paint: Paint): string => {
+    const productName = `${paint.brand} ${paint.series || ''} ${paint.name} (${paint.code})`.replace(/\s+/g, ' ').trim();
+    
+    // Priority 1: Use an existing, valid product page URL.
+    if (paint.amazonUrl && paint.amazonUrl.includes('/dp/')) {
+        const url = new URL(paint.amazonUrl);
+        // Ensure our affiliate tag is on the URL.
+        if (AFFILIATE_TAGS.amazon) {
+            url.searchParams.set('tag', AFFILIATE_TAGS.amazon);
+        }
+        return url.toString();
     }
-    return amazonUrl.toString();
+
+    // Priority 2: Create a highly filtered search link.
+    const url = new URL('https://www.amazon.co.jp/s');
+    url.searchParams.set('k', productName);
+    
+    // Add filters for "Sold by Amazon" and "Prime eligible"
+    // rh=p_6:AN1VRQENFRJN5 -> merchant: Amazon.co.jp
+    // rh=p_76:2227292051 -> delivery: Prime
+    url.searchParams.set('rh', 'p_6:AN1VRQENFRJN5,p_76:2227292051');
+
+    // Add the affiliate tag.
+    if (AFFILIATE_TAGS.amazon) {
+      url.searchParams.set('tag', AFFILIATE_TAGS.amazon);
+    }
+    
+    return url.toString();
   };
+
 
   const handleGenerateAndApplyLinks = async (paint: Paint) => {
       setIndividualLoading(prev => new Set(prev).add(paint.code));
 
       const productName = `${paint.brand} ${paint.series || ''} ${paint.name} (${paint.code})`.replace(/\s+/g, ' ').trim();
       
-      const [amazonUrl, rakutenUrl] = await Promise.all([
-          generateAmazonSearchLink(productName),
-          findLowestPriceRakutenLink(productName)
-      ]);
+      const newAmazonUrl = generateAmazonLink(paint);
+      const newRakutenUrl = await findLowestPriceRakutenLink(productName);
 
       const newPaints = editablePaints.map(p => {
           if (p.code === paint.code) {
               return { 
                   ...p, 
-                  amazonUrl: amazonUrl, 
-                  // Only update rakuten link if the API returned one
-                  rakutenUrl: rakutenUrl ?? p.rakutenUrl 
+                  amazonUrl: newAmazonUrl, 
+                  rakutenUrl: newRakutenUrl ?? p.rakutenUrl 
                 };
           }
           return p;
@@ -79,13 +98,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
   };
 
   const handleBulkUpdateLinks = async () => {
-      if (!window.confirm('すべての塗料に対してアフィリエイトリンクを更新します。\n・Amazonリンクは空の場合のみ生成されます。\n・楽天リンクは常に最安値情報を取得して上書きされます。\n\nこの処理は時間がかかります。よろしいですか？')) {
+      if (!window.confirm('すべての塗料に対してアフィリエイトリンクを更新します。\n・Amazonリンクは「販売元Amazon」「Prime対象」で絞り込んだ検索結果に更新されます。(手動設定された商品ページURLは優先されます)\n・楽天リンクは常に最安値情報を取得して上書きされます。\n\nこの処理は時間がかかります。よろしいですか？')) {
           return;
       }
       setIsBulkLoading(true);
       setBulkProgress('更新準備中...');
       
-      const updatedPaints = [...editablePaints];
+      let updatedPaints = [...editablePaints];
 
       for (let i = 0; i < updatedPaints.length; i++) {
           const paint = updatedPaints[i];
@@ -93,20 +112,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ paints, onUpdate, isVisible, on
           
           const productName = `${paint.brand} ${paint.series || ''} ${paint.name} (${paint.code})`.replace(/\s+/g, ' ').trim();
 
-          const shouldUpdateAmazon = !paint.amazonUrl;
-          
-          // Always update Rakuten link
+          const newAmazonUrl = generateAmazonLink(paint);
           const newRakutenUrl = await findLowestPriceRakutenLink(productName);
           
-          if (newRakutenUrl) {
-              paint.rakutenUrl = newRakutenUrl;
-          }
-          if (shouldUpdateAmazon) {
-              paint.amazonUrl = generateAmazonSearchLink(productName);
-          }
+          updatedPaints[i] = {
+              ...paint,
+              amazonUrl: newAmazonUrl,
+              rakutenUrl: newRakutenUrl ?? paint.rakutenUrl,
+          };
           
-          // To avoid hitting Rakuten API rate limit (1 req/sec)
-          await sleep(1000); 
+          await sleep(1100); 
       }
 
       setEditablePaints(updatedPaints);

@@ -10,6 +10,7 @@ import ColorReplicator from './components/ColorReplicator';
 import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
 import ApiKeyManager from './components/ApiKeyManager';
+import { initialPaints as defaultPaints } from './paintsData';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
 const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
@@ -98,7 +99,7 @@ const App: React.FC = () => {
       setApiKey(storedApiKey);
     }
     
-    const loadPaints = async () => {
+    const loadPaints = () => {
       setIsLoadingPaints(true);
       setPaintLoadingError(null);
       try {
@@ -125,25 +126,20 @@ const App: React.FC = () => {
               }
           }
           
-          // If no data was loaded from local storage, use fetch to get the base data.
+          // If no data was loaded from local storage, use the imported default data.
           if (paintsData === null) {
-              const response = await fetch('./paints.json');
-              if (!response.ok) {
-                  throw new Error(`Failed to fetch paints.json: ${response.statusText}`);
-              }
-              const initialPaints = await response.json() as Paint[];
-              paintsData = initialPaints;
-              console.log("静的JSONファイルから塗料データを読み込みました。");
+              paintsData = defaultPaints;
+              console.log("インポートされたモジュールから塗料データを読み込みました。");
               
               // If entering admin mode, populate local storage with the base data.
               if (adminParam) {
                   localStorage.setItem(PAINTS_STORAGE_KEY, JSON.stringify(paintsData));
-                  console.log("管理者モード: インポートされたpaints.jsonでローカルストレージを初期化しました。");
+                  console.log("管理者モード: インポートされたデータでローカルストレージを初期化しました。");
               }
           }
           
           if (!paintsData || paintsData.length === 0) {
-               throw new Error("利用可能な塗料データが見つかりませんでした。paints.jsonファイルが空か、正しくありません。");
+               throw new Error("利用可能な塗料データが見つかりませんでした。paintsData.tsファイルが空か、正しくありません。");
           }
   
           setPaints(paintsData);
