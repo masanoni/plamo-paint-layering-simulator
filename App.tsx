@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
-import { Brand, PaintLayer, PaintType, MixedPaintInfo, ParsedRecipe, ParsedLayer, Paint, PaintSystem } from './types';
+import { Brand, PaintLayer, PaintType, MixedPaintInfo, ParsedRecipe, ParsedLayer, Paint, PaintSystem, SavedProject } from './types';
 import LayerItem from './components/LayerItem';
 import ColorDisplay from './components/ColorDisplay';
 import AdvicePanel from './components/AdvicePanel';
@@ -10,10 +10,12 @@ import ColorReplicator from './components/ColorReplicator';
 import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
 import ApiKeyManager from './components/ApiKeyManager';
+import ProjectManager from './components/ProjectManager';
 import { initialPaints as defaultPaints } from './paintsData';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
 const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
+const PROJECTS_STORAGE_KEY = 'plamo_simulator_projects';
 
 // Helper to convert hex to RGB
 const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
@@ -86,6 +88,8 @@ const App: React.FC = () => {
   const [layers, setLayers] = useState<PaintLayer[]>([]);
   const [baseColor, setBaseColor] = useState<string>('#808080');
   const [apiKey, setApiKey] = useState<string>('');
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+
   const draggedItemIndex = useRef<number | null>(null);
   const [mixerState, setMixerState] = useState<{isOpen: boolean; layerId: string | null}>({isOpen: false, layerId: null});
   const [isAdminMode, setIsAdminMode] = useState(false);
@@ -94,11 +98,24 @@ const App: React.FC = () => {
   const [paintLoadingError, setPaintLoadingError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Load API Key
     const storedApiKey = localStorage.getItem(API_KEY_STORAGE_KEY);
     if (storedApiKey) {
       setApiKey(storedApiKey);
     }
     
+    // Load Saved Projects
+    try {
+        const storedProjectsJSON = localStorage.getItem(PROJECTS_STORAGE_KEY);
+        if (storedProjectsJSON) {
+            setSavedProjects(JSON.parse(storedProjectsJSON));
+        }
+    } catch (e) {
+        console.error("Failed to load projects from localStorage", e);
+        localStorage.removeItem(PROJECTS_STORAGE_KEY); // Clear corrupted data
+    }
+
+    // Load Paint Database
     const loadPaints = () => {
       setIsLoadingPaints(true);
       setPaintLoadingError(null);
@@ -109,7 +126,6 @@ const App: React.FC = () => {
   
           let paintsData: Paint[] | null = null;
   
-          // In admin mode, prioritize loading potentially edited paints from local storage.
           if (adminParam) {
               const storedPaintsJSON = localStorage.getItem(PAINTS_STORAGE_KEY);
               if (storedPaintsJSON) {
@@ -117,24 +133,18 @@ const App: React.FC = () => {
                       const storedPaints = JSON.parse(storedPaintsJSON);
                       if (Array.isArray(storedPaints) && storedPaints.length > 0) {
                           paintsData = storedPaints;
-                          console.log("管理者モード: ローカルストレージからデータを読み込みました。");
                       }
                   } catch (e) {
-                      console.error("ローカルストレージの塗料データの解析に失敗しました。デフォルトデータで初期化します。", e);
-                      localStorage.removeItem(PAINTS_STORAGE_KEY); // Clear corrupted data
+                      console.error("Failed to parse paints from localStorage. Initializing with default.", e);
+                      localStorage.removeItem(PAINTS_STORAGE_KEY);
                   }
               }
           }
           
-          // If no data was loaded from local storage, use the imported default data.
           if (paintsData === null) {
               paintsData = defaultPaints;
-              console.log("インポートされたモジュールから塗料データを読み込みました。");
-              
-              // If entering admin mode, populate local storage with the base data.
               if (adminParam) {
                   localStorage.setItem(PAINTS_STORAGE_KEY, JSON.stringify(paintsData));
-                  console.log("管理者モード: インポートされたデータでローカルストレージを初期化しました。");
               }
           }
           
@@ -145,12 +155,9 @@ const App: React.FC = () => {
           setPaints(paintsData);
   
       } catch (error) {
-          console.error("塗料データの処理中にエラー:", error);
-          if (error instanceof Error) {
-              setPaintLoadingError(`塗料データベースの読み込み中にエラーが発生しました。\n\n詳細: ${error.message}`);
-          } else {
-               setPaintLoadingError("塗料データベースの読み込み中に不明なエラーが発生しました。");
-          }
+          console.error("Error during paint data processing:", error);
+          const message = error instanceof Error ? error.message : "An unknown error occurred.";
+          setPaintLoadingError(`塗料データベースの読み込み中にエラーが発生しました。\n\n詳細: ${message}`);
       } finally {
           setIsLoadingPaints(false);
       }
@@ -174,7 +181,52 @@ const App: React.FC = () => {
     setApiKey(key);
     localStorage.setItem(API_KEY_STORAGE_KEY, key);
   };
+  
+  // --- Project Management Handlers ---
+  const handleSaveProject = useCallback((projectName: string) => {
+    if (!projectName.trim()) {
+        alert("プロジェクト名を入力してください。");
+        return;
+    }
+    
+    const newProject: SavedProject = {
+        id: Date.now().toString(),
+        name: projectName.trim(),
+        createdAt: new Date().toISOString(),
+        baseColor: baseColor,
+        layers: layers,
+    };
+    
+    const updatedProjects = [...savedProjects, newProject];
+    setSavedProjects(updatedProjects);
+    localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(updatedProjects));
+    alert(`プロジェクト「${newProject.name}」が保存されました。`);
+  }, [baseColor, layers, savedProjects]);
 
+  const handleLoadProject = useCallback((projectId: string) => {
+      const projectToLoad = savedProjects.find(p => p.id === projectId);
+      if (projectToLoad) {
+          if (window.confirm(`「${projectToLoad.name}」を読み込みますか？\n現在のレイヤー設定は上書きされます。`)) {
+              setBaseColor(projectToLoad.baseColor);
+              setLayers(projectToLoad.layers);
+              alert(`プロジェクト「${projectToLoad.name}」を読み込みました。`);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+      }
+  }, [savedProjects]);
+
+  const handleDeleteProject = useCallback((projectId: string) => {
+      const projectToDelete = savedProjects.find(p => p.id === projectId);
+      if (projectToDelete) {
+          if (window.confirm(`本当に「${projectToDelete.name}」を削除しますか？\nこの操作は元に戻せません。`)) {
+              const updatedProjects = savedProjects.filter(p => p.id !== projectId);
+              setSavedProjects(updatedProjects);
+              localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(updatedProjects));
+          }
+      }
+  }, [savedProjects]);
+
+  // --- Layer Management Handlers ---
   const addNewLayer = useCallback(() => {
     if (paints.length === 0) return;
     const defaultPaint = paints.find(p => p.code === 'C1') || paints[0];
@@ -229,7 +281,6 @@ const App: React.FC = () => {
     setLayers(newLayers);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [paints]);
-
 
   const finalColor = useMemo(() => {
     return layers.reduce(
@@ -315,6 +366,13 @@ const App: React.FC = () => {
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 flex flex-col gap-6">
             
+            <ProjectManager 
+                projects={savedProjects}
+                onSave={handleSaveProject}
+                onLoad={handleLoadProject}
+                onDelete={handleDeleteProject}
+            />
+
             <ColorReplicator onApplyRecipe={handleRecipeApply} paints={paints} apiKey={apiKey} />
 
             <div className="bg-slate-800 p-6 rounded-lg shadow-lg">

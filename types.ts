@@ -1,3 +1,4 @@
+
 export enum PaintType {
   NORMAL = '通常色',
   METALLIC = 'メタリック',
@@ -85,4 +86,12 @@ export interface ParsedRecipe {
   topCoat: ParsedLayer | null;
   products: string[];
   recipeText: string;
+}
+
+export interface SavedProject {
+  id: string;
+  name: string;
+  createdAt: string;
+  baseColor: string;
+  layers: PaintLayer[];
 }
