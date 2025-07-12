@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PaintLayer, MixedPaintInfo, Paint, PaintType, Brand, PaintTypeDisplay, BrandDisplay } from '../types';
+import { PaintLayer, MixedPaintInfo, Paint, PaintType, Brand } from '../types';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
 
@@ -172,7 +172,7 @@ const ColorMixerModal: React.FC<ColorMixerModalProps> = ({ isOpen, onClose, onSa
                 <span className="font-bold text-slate-300">結果:</span>
                 <div className="w-10 h-10 rounded-md border-2 border-slate-600" style={{ backgroundColor: mixedColor }}></div>
                 <span className="font-mono text-lg text-white">{mixedColor}</span>
-                <span className="px-2 py-1 bg-sky-800 text-sky-200 text-xs font-bold rounded">{PaintTypeDisplay[mixedType]}</span>
+                <span className="px-2 py-1 bg-sky-800 text-sky-200 text-xs font-bold rounded">{mixedType}</span>
             </div>
             <div className="flex gap-4">
                 <button onClick={onClose} className="px-4 py-2 font-bold text-slate-300 bg-slate-600 rounded-md hover:bg-slate-500 transition-colors">キャンセル</button>
