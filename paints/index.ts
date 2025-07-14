@@ -18,9 +18,10 @@ import { acrysionBaseColorPaints } from './creos/acrysion/acrysion-base-color';
 
 import { gaiaColorPaints } from './gaia/lacquer/gaia-color';
 import { exSeriesPaints } from './gaia/lacquer/ex-series';
-import { starBrightPaints } from './gaia/lacquer/star-bright';
+import { metallicColorPaints } from './gaia/lacquer/metallic-color';
 import { pearlColorPaints } from './gaia/lacquer/pearl-color';
 import { premiumSeriesPaints } from './gaia/lacquer/premium-series';
+import { prismColorPaints } from './gaia/lacquer/prism-color';
 
 
 // 今後、他の塗料シリーズをここに追加していきます。
@@ -41,7 +42,8 @@ export const allPaints: Paint[] = [
   ...acrysionBaseColorPaints,
   ...gaiaColorPaints,
   ...exSeriesPaints,
-  ...starBrightPaints,
+  ...metallicColorPaints,
   ...pearlColorPaints,
   ...premiumSeriesPaints,
+  ...prismColorPaints,
 ];

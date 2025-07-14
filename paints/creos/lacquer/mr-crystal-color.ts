@@ -76,23 +76,23 @@ export const mrCrystalColorPaints: Paint[] = [
   {
     brand: Brand.CREOS,
     series: "Mr.クリスタルカラー",
-    name: "ディープクリアーレッド",
+    name: "ターコイズグリーン",
     code: "XC07",
-    hex: "#c0002a",
-    type: PaintType.CLEAR,
+    hex: "#51c3b5",
+    type: PaintType.PEARL,
     paintSystem: PaintSystem.LACQUER,
     finish: "gloss",
-    amazonUrl: "https://www.amazon.co.jp/s?k=GSI%E3%82%AF%E3%83%AC%E3%82%AA%E3%82%B9+Mr.%E3%82%AF%E3%83%AA%E3%82%B9%E3%82%BF%E3%83%AB%E3%82%AB%E3%83%A9%E3%83%BC+%E3%83%87%E3%82%A3%E3%83%BC%E3%83%97%E3%82%AF%E3%83%AA%E3%82%A2%E3%83%BC%E3%83%AC%E3%83%83%E3%83%89+%28XC07%29&rh=p_6%3AAN1VRQENFRJN5%2Cp_76%3A2227292051&tag=masanoni-22"
+    amazonUrl: "https://www.amazon.co.jp/s?k=GSI%E3%82%AF%E3%83%AC%E3%82%AA%E3%82%B9+Mr.%E3%82%AF%E3%83%AA%E3%82%B9%E3%82%BF%E3%83%AB%E3%82%AB%E3%83%A9%E3%83%BC+%E3%82%BF%E3%83%BC%E3%82%B3%E3%82%A4%E3%82%BA%E3%82%B0%E3%83%AA%E3%83%BC%E3%83%B3+%28XC07%29&rh=p_6%3AAN1VRQENFRJN5%2Cp_76%3A2227292051&tag=masanoni-22"
   },
   {
     brand: Brand.CREOS,
     series: "Mr.クリスタルカラー",
-    name: "ディープクリアーブルー",
+    name: "ムーンストーンパール",
     code: "XC08",
-    hex: "#004098",
-    type: PaintType.CLEAR,
+    hex: "#e8f0f0",
+    type: PaintType.PEARL,
     paintSystem: PaintSystem.LACQUER,
     finish: "gloss",
-    amazonUrl: "https://www.amazon.co.jp/s?k=GSI%E3%82%AF%E3%83%AC%E3%82%AA%E3%82%B9+Mr.%E3%82%AF%E3%83%AA%E3%82%B9%E3%82%BF%E3%83%AB%E3%82%AB%E3%83%A9%E3%83%BC+%E3%83%87%E3%82%A3%E3%83%BC%E3%83%97%E3%82%AF%E3%83%AA%E3%82%A2%E3%83%BC%E3%83%96%E3%83%AB%E3%83%BC+%28XC08%29&rh=p_6%3AAN1VRQENFRJN5%2Cp_76%3A2227292051&tag=masanoni-22"
-  },
+    amazonUrl: "https://www.amazon.co.jp/s?k=GSI%E3%82%AF%E3%83%AC%E3%82%AA%E3%82%B9+Mr.%E3%82%AF%E3%83%AA%E3%82%B9%E3%82%BF%E3%83%AB%E3%82%AB%E3%83%A9%E3%83%BC+%E3%83%A0%E3%83%BC%E3%83%B3%E3%82%B9%E3%83%88%E3%83%BC%E3%83%B3%E3%83%91%E3%83%BC%E3%83%AB+%28XC08%29&rh=p_6%3AAN1VRQENFRJN5%2Cp_76%3A2227292051&tag=masanoni-22"
+  }
 ];

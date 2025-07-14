@@ -177,7 +177,7 @@ const App: React.FC = () => {
           }
           
           if (!paintsData || paintsData.length === 0) {
-               throw new Error("利用可能な塗料データが見つかりませんでした。paintsData.tsファイルが空か、正しくありません。");
+               throw new Error("利用可能な塗料データが見つかりませんでした。paints/index.tsからインポートされたデータが空か、正しくありません。");
           }
   
           setPaints(paintsData);
@@ -373,7 +373,7 @@ const App: React.FC = () => {
           <div className="max-w-2xl text-center bg-slate-800 p-8 rounded-lg shadow-2xl border border-red-500">
               <h1 className="text-3xl font-bold text-red-400 mb-4">アプリケーションエラー</h1>
               <p className="text-lg text-slate-300 mb-2 whitespace-pre-wrap">{paintLoadingError}</p>
-              <p className="mt-6 text-slate-400">開発者の方へ: paints.jsonファイルが正しくインポートされているか、内容が正しい形式であるかをご確認ください。</p>
+              <p className="mt-6 text-slate-400">開発者の方へ: paints/index.ts および関連する各塗料データファイルが正しく設定されているかご確認ください。</p>
           </div>
       </div>
     );
