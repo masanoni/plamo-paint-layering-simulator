@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { PaintLayer, MixedPaintInfo, Paint, PaintType, Brand } from '../types';
+import { PaintLayer, MixedPaintInfo, Paint, PaintType, Brand, PaintSystem } from '../types';
 import PlusIcon from './icons/PlusIcon';
 import TrashIcon from './icons/TrashIcon';
 
@@ -16,6 +16,13 @@ const rgbToHex = (r: number, g: number, b: number): string => {
   return `#${toHex(clamp(r))}${toHex(clamp(g))}${toHex(clamp(b))}`;
 };
 
+interface ExtendedMixedInfo extends MixedPaintInfo {
+    id: string;
+    paintSystem: PaintSystem;
+    brand: Brand;
+    series: string;
+}
+
 interface ColorMixerModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -25,31 +32,42 @@ interface ColorMixerModalProps {
 }
 
 const ColorMixerModal: React.FC<ColorMixerModalProps> = ({ isOpen, onClose, onSave, layer, paints }) => {
-  const [mix, setMix] = useState<MixedPaintInfo[]>([]);
+  const [mixRows, setMixRows] = useState<ExtendedMixedInfo[]>([]);
 
   useEffect(() => {
-    if (layer?.mixData?.paints) {
-      setMix(layer.mixData.paints);
-    } else if (layer) {
-      const existingPaint = paints.find(p => p.hex === layer.color && p.name.includes(layer.name.split(' (')[0]));
-      if(existingPaint) {
-        setMix([{ code: existingPaint.code, ratio: 100 }]);
-      } else {
-        setMix([]);
-      }
+    if (layer) {
+        const initialMixData = layer.mixData?.paints || [];
+        if (initialMixData.length === 0 && layer.brand !== Brand.OTHER) {
+            const paintMatch = paints.find(p => p.hex === layer.color && layer.name.includes(p.name));
+            if (paintMatch) {
+                initialMixData.push({ code: paintMatch.code, ratio: 100 });
+            }
+        }
+
+        const newMixRows = initialMixData.map(p => {
+            const details = paints.find(paint => paint.code === p.code);
+            return {
+                id: Math.random().toString(36),
+                ...p,
+                paintSystem: details?.paintSystem || PaintSystem.LACQUER,
+                brand: details?.brand || Brand.CREOS,
+                series: details?.series || 'Mr.カラー'
+            };
+        });
+        setMixRows(newMixRows);
     } else {
-      setMix([]);
+        setMixRows([]);
     }
-  }, [layer, paints]);
+  }, [layer, isOpen, paints]);
 
   const { mixedColor, mixedType } = useMemo(() => {
-    if (mix.length === 0) return { mixedColor: '#ffffff', mixedType: PaintType.NORMAL };
+    if (mixRows.length === 0) return { mixedColor: '#ffffff', mixedType: PaintType.NORMAL };
     
     let totalR = 0, totalG = 0, totalB = 0;
-    const totalRatio = mix.reduce((sum, p) => sum + p.ratio, 0);
+    const totalRatio = mixRows.reduce((sum, p) => sum + p.ratio, 0);
     if (totalRatio === 0) return { mixedColor: '#ffffff', mixedType: PaintType.NORMAL };
     
-    const paintDetails = mix.map(p => ({
+    const paintDetails = mixRows.map(p => ({
         ...p,
         paint: paints.find(pp => pp.code === p.code)
     })).filter(p => p.paint);
@@ -69,47 +87,83 @@ const ColorMixerModal: React.FC<ColorMixerModalProps> = ({ isOpen, onClose, onSa
                        PaintType.NORMAL;
 
     return { mixedColor: rgbToHex(totalR, totalG, totalB), mixedType: finalType };
-  }, [mix, paints]);
+  }, [mixRows, paints]);
+  
+  const updateMixRow = (index: number, newPaint: Paint) => {
+    const newMixRows = [...mixRows];
+    newMixRows[index] = {
+      ...newMixRows[index],
+      code: newPaint.code,
+      paintSystem: newPaint.paintSystem,
+      brand: newPaint.brand,
+      series: newPaint.series || '基本色',
+    };
+    setMixRows(newMixRows);
+  };
+  
+  const handleSystemChange = (index: number, newSystem: PaintSystem) => {
+    const defaultPaint = paints.find(p => p.paintSystem === newSystem) || paints[0];
+    if (defaultPaint) updateMixRow(index, defaultPaint);
+  };
+  
+  const handleBrandChange = (index: number, newBrand: Brand) => {
+    const defaultPaint = paints.find(p => p.paintSystem === mixRows[index].paintSystem && p.brand === newBrand) || paints.find(p => p.paintSystem === mixRows[index].paintSystem) || paints[0];
+    if (defaultPaint) updateMixRow(index, defaultPaint);
+  };
+
+  const handleSeriesChange = (index: number, newSeries: string) => {
+    const defaultPaint = paints.find(p => p.paintSystem === mixRows[index].paintSystem && p.brand === mixRows[index].brand && (p.series || '基本色') === newSeries) || paints[0];
+    if (defaultPaint) updateMixRow(index, defaultPaint);
+  };
+
+  const handlePaintChange = (index: number, newCode: string) => {
+    const selectedPaint = paints.find(p => p.code === newCode && p.brand === mixRows[index].brand && (p.series || '基本色') === mixRows[index].series);
+    if(selectedPaint) updateMixRow(index, selectedPaint);
+  };
 
   const addPaint = () => {
     if (paints.length === 0) return;
     const firstPaint = paints[0];
-    const newMix = [...mix, { code: firstPaint.code, ratio: 50 }];
+    const newRow: ExtendedMixedInfo = {
+        id: Math.random().toString(36),
+        code: firstPaint.code,
+        ratio: 50,
+        paintSystem: firstPaint.paintSystem,
+        brand: firstPaint.brand,
+        series: firstPaint.series || '基本色',
+    };
+    const newMix = [...mixRows, newRow];
     normalizeRatios(newMix);
   };
   
-  const removePaint = (index: number) => {
-    const newMix = mix.filter((_, i) => i !== index);
+  const removePaint = (id: string) => {
+    const newMix = mixRows.filter((p) => p.id !== id);
     normalizeRatios(newMix);
-  };
-  
-  const updatePaint = (index: number, newCode: string) => {
-    const newMix = [...mix];
-    newMix[index] = { ...newMix[index], code: newCode };
-    setMix(newMix);
   };
   
   const updateRatio = (index: number, newRatio: number) => {
-    const newMix = [...mix];
+    const newMix = [...mixRows];
     newMix[index] = { ...newMix[index], ratio: newRatio };
-    setMix(newMix);
+    setMixRows(newMix);
   };
 
-  const normalizeRatios = (currentMix: MixedPaintInfo[]) => {
+  const normalizeRatios = (currentMix: ExtendedMixedInfo[]) => {
     const totalRatio = currentMix.reduce((sum, p) => sum + p.ratio, 0);
     if(totalRatio === 0 || currentMix.length === 0) {
-        setMix(currentMix);
+        setMixRows(currentMix);
         return;
     };
     const scale = 100 / totalRatio;
-    setMix(currentMix.map(p => ({ ...p, ratio: Math.round(p.ratio * scale) })));
+    setMixRows(currentMix.map(p => ({ ...p, ratio: Math.round(p.ratio * scale) })));
   };
 
   const handleSave = () => {
-    if (!layer || mix.length === 0) return;
-    const total = mix.reduce((sum, p) => sum + p.ratio, 0);
-    const finalMix = mix.map(p => ({...p, ratio: Math.round(p.ratio * 100 / total)}));
-
+    if (!layer || mixRows.length === 0) return;
+    const total = mixRows.reduce((sum, p) => sum + p.ratio, 0);
+    const finalMix = mixRows.map(p => ({ code: p.code, ratio: Math.round(p.ratio * 100 / total) }));
+    
+    // Use the paint system of the first paint in the mix as the system for the whole layer
+    const representativePaint = paints.find(p => p.code === finalMix[0]?.code);
 
     const newLayerData: Partial<PaintLayer> = {
         brand: Brand.OTHER,
@@ -118,6 +172,7 @@ const ColorMixerModal: React.FC<ColorMixerModalProps> = ({ isOpen, onClose, onSa
         type: mixedType,
         mixData: { paints: finalMix },
         series: undefined,
+        paintSystem: representativePaint?.paintSystem || layer.paintSystem
     };
     onSave(layer.id, newLayerData);
     onClose();
@@ -125,39 +180,48 @@ const ColorMixerModal: React.FC<ColorMixerModalProps> = ({ isOpen, onClose, onSa
 
   if (!isOpen || !layer) return null;
   
-  const groupedPaints = paints.reduce((acc, p) => {
-      const groupKey = `${p.brand} - ${p.series || '基本色'}`;
-      if (!acc[groupKey]) acc[groupKey] = [];
-      acc[groupKey].push(p);
-      return acc;
-  }, {} as Record<string, Paint[]>);
+  const selectClassName = "w-full bg-slate-900 border border-slate-700 rounded-md px-2 py-1 text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-colors";
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4" onClick={onClose}>
-      <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-slate-800 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <header className="p-4 border-b border-slate-700">
           <h2 className="text-2xl font-bold text-sky-400">カラーミキサー (調色)</h2>
           <p className="text-slate-400">塗料を混ぜてカスタムカラーを作成します。</p>
         </header>
         
         <div className="p-6 overflow-y-auto flex-grow">
-          {mix.map((p, index) => {
-            const paintInfo = paints.find(pp => pp.code === p.code);
+          {mixRows.map((row, index) => {
+            const paintInfo = paints.find(p => p.code === row.code);
+            const availableSystems = Object.values(PaintSystem);
+            const availableBrands = [...new Set(paints.filter(p => p.paintSystem === row.paintSystem).map(p => p.brand))];
+            const availableSeries = [...new Set(paints.filter(p => p.paintSystem === row.paintSystem && p.brand === row.brand).map(p => p.series || '基本色'))];
+            const paintsInSeries = paints.filter(p => p.paintSystem === row.paintSystem && p.brand === row.brand && (p.series || '基本色') === row.series);
+            
             return (
-              <div key={index} className="flex items-center gap-3 mb-4 bg-slate-700 p-3 rounded-lg">
-                <div className="w-8 h-8 rounded" style={{ backgroundColor: paintInfo?.hex || '#000' }}></div>
-                <select value={p.code} onChange={e => updatePaint(index, e.target.value)} className="flex-grow bg-slate-800 border border-slate-600 rounded-md px-2 py-1.5 focus:ring-2 focus:ring-sky-500 focus:outline-none">
-                   {Object.entries(groupedPaints).map(([groupName, paintGroup]) => (
-                       <optgroup label={groupName} key={groupName}>
-                           {paintGroup.map(paint => (
-                               <option key={paint.code} value={paint.code}>{paint.name} ({paint.code})</option>
-                           ))}
-                       </optgroup>
-                   ))}
-                </select>
-                <input type="range" min="0" max="100" value={p.ratio} onChange={e => updateRatio(index, parseInt(e.target.value))} className="w-32 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer" onMouseUp={() => normalizeRatios(mix)} onTouchEnd={() => normalizeRatios(mix)} />
-                <span className="text-sm font-mono text-slate-300 w-12 text-right">{p.ratio}%</span>
-                <button onClick={() => removePaint(index)} className="p-1 text-slate-400 hover:text-red-500 rounded-full"><TrashIcon className="w-5 h-5" /></button>
+              <div key={row.id} className="flex items-center gap-3 mb-4 bg-slate-700 p-3 rounded-lg">
+                <div className="w-8 h-8 rounded flex-shrink-0" style={{ backgroundColor: paintInfo?.hex || '#000' }}></div>
+                <div className="flex-grow grid grid-cols-2 gap-2">
+                    <select value={row.paintSystem} onChange={e => handleSystemChange(index, e.target.value as PaintSystem)} className={selectClassName}>
+                        {availableSystems.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                     <select value={row.brand} onChange={e => handleBrandChange(index, e.target.value as Brand)} className={selectClassName}>
+                        {availableBrands.map(b => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                    <select value={row.series} onChange={e => handleSeriesChange(index, e.target.value)} className={selectClassName}>
+                        {availableSeries.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                    <select value={row.code} onChange={e => handlePaintChange(index, e.target.value)} className={selectClassName}>
+                        {paintsInSeries.map(p => (
+                            <option key={p.code} value={p.code}>{`${p.name} (${p.code})`}</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    <input type="range" min="0" max="100" value={row.ratio} onChange={e => updateRatio(index, parseInt(e.target.value))} className="w-24 h-2 bg-slate-600 rounded-lg appearance-none cursor-pointer" onMouseUp={() => normalizeRatios(mixRows)} onTouchEnd={() => normalizeRatios(mixRows)} />
+                    <span className="text-sm font-mono text-slate-300 w-12 text-right">{row.ratio}%</span>
+                    <button onClick={() => removePaint(row.id)} className="p-1 text-slate-400 hover:text-red-500 rounded-full"><TrashIcon className="w-5 h-5" /></button>
+                </div>
               </div>
             );
           })}

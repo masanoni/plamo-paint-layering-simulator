@@ -11,7 +11,9 @@ import AdminPanel from './components/AdminPanel';
 import AdminIcon from './components/icons/AdminIcon';
 import ApiKeyManager from './components/ApiKeyManager';
 import ProjectManager from './components/ProjectManager';
-import { initialPaints as defaultPaints } from './paintsData';
+import { allPaints as defaultPaints } from './paints/index';
+import UserManualModal from './components/UserManualModal';
+import QuestionMarkCircleIcon from './components/icons/QuestionMarkCircleIcon';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
 const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
@@ -40,26 +42,51 @@ const rgbToHex = (r: number, g: number, b: number): string => {
 const blendColors = (topLayer: PaintLayer, bottomColorHex: string): string => {
   const topRgb = hexToRgb(topLayer.color);
   const bottomRgb = hexToRgb(bottomColorHex);
-  
+
+  if (!topRgb || !bottomRgb) return bottomColorHex;
+
+  let opacity;
   const baseOpacity = topLayer.coats / 10.0;
-  const opacity = Math.pow(baseOpacity, 0.75);
 
-  if (!topRgb || !bottomRgb) return bottomColorHex; 
+  // Define opacity curves based on paint type
+  switch (topLayer.type) {
+    case PaintType.METALLIC:
+    case PaintType.PEARL:
+      // Metallics and pearls cover more effectively
+      opacity = Math.pow(baseOpacity, 0.6);
+      break;
+    case PaintType.CLEAR:
+      // Clear coats have less pigment and are more transparent
+      opacity = Math.pow(baseOpacity, 1.2) * 0.5; // Less impact per coat
+      break;
+    case PaintType.NORMAL:
+    default:
+      // Standard opacity curve
+      opacity = Math.pow(baseOpacity, 0.75);
+      break;
+  }
 
+  // Special handling for clear colors to simulate candy coats
   if (topLayer.type === PaintType.CLEAR && opacity > 0) {
+    // Multiply blend mode for the color part
     const multipliedR = (topRgb.r * bottomRgb.r) / 255;
     const multipliedG = (topRgb.g * bottomRgb.g) / 255;
     const multipliedB = (topRgb.b * bottomRgb.b) / 255;
+    
+    // Alpha blend the result of the multiply operation over the bottom layer
     const finalR = multipliedR * opacity + bottomRgb.r * (1 - opacity);
     const finalG = multipliedG * opacity + bottomRgb.g * (1 - opacity);
     const finalB = multipliedB * opacity + bottomRgb.b * (1 - opacity);
-    return rgbToHex(finalR, finalG, finalB);
-  } else {
-    const finalR = topRgb.r * opacity + bottomRgb.r * (1 - opacity);
-    const finalG = topRgb.g * opacity + bottomRgb.g * (1 - opacity);
-    const finalB = topRgb.b * opacity + bottomRgb.b * (1 - opacity);
+    
     return rgbToHex(finalR, finalG, finalB);
   }
+
+  // Standard alpha compositing for other paint types
+  const finalR = topRgb.r * opacity + bottomRgb.r * (1 - opacity);
+  const finalG = topRgb.g * opacity + bottomRgb.g * (1 - opacity);
+  const finalB = topRgb.b * opacity + bottomRgb.b * (1 - opacity);
+
+  return rgbToHex(finalR, finalG, finalB);
 };
 
 const calculateMixedColor = (mixData: { paints: MixedPaintInfo[] }, availablePaints: Paint[]): string => {
@@ -94,6 +121,7 @@ const App: React.FC = () => {
   const [mixerState, setMixerState] = useState<{isOpen: boolean; layerId: string | null}>({isOpen: false, layerId: null});
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [isAdminPanelVisible, setIsAdminPanelVisible] = useState(false);
+  const [isManualOpen, setIsManualOpen] = useState(false);
   const [isLoadingPaints, setIsLoadingPaints] = useState(true);
   const [paintLoadingError, setPaintLoadingError] = useState<string | null>(null);
 
@@ -354,11 +382,19 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="text-center mb-8">
+        <header className="text-center mb-8 relative">
           <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-600">
             プラモ塗料 重ね塗りシミュレーター
           </h1>
           <p className="mt-2 text-slate-400">エアブラシ塗装のシミュレーション、調色、AIによる色再現レシピ生成が可能です。</p>
+          <button 
+            onClick={() => setIsManualOpen(true)}
+            className="absolute top-0 right-0 flex items-center gap-2 p-2 font-bold text-slate-400 hover:text-sky-400 transition-colors"
+            title="ユーザーマニュアルを開く"
+          >
+            <QuestionMarkCircleIcon className="w-7 h-7" />
+            <span className="hidden sm:inline text-sm">マニュアル</span>
+          </button>
         </header>
 
         <ApiKeyManager initialKey={apiKey} onSave={handleSaveApiKey} />
@@ -427,6 +463,8 @@ const App: React.FC = () => {
         layer={mixingLayer}
         paints={paints}
       />
+      
+      <UserManualModal isOpen={isManualOpen} onClose={() => setIsManualOpen(false)} />
       
       {isAdminMode && (
         <>
