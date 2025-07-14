@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Brand, PaintLayer, PaintType, MixedPaintInfo, ParsedRecipe, ParsedLayer, Paint, PaintSystem, SavedProject } from './types';
 import LayerItem from './components/LayerItem';
@@ -14,6 +13,7 @@ import ProjectManager from './components/ProjectManager';
 import { allPaints as defaultPaints } from './paints/index';
 import UserManualModal from './components/UserManualModal';
 import QuestionMarkCircleIcon from './components/icons/QuestionMarkCircleIcon';
+import AdUnit from './components/AdUnit';
 
 const PAINTS_STORAGE_KEY = 'plamo_paint_simulator_paints';
 const API_KEY_STORAGE_KEY = 'plamo_paint_simulator_api_key';
@@ -399,6 +399,10 @@ const App: React.FC = () => {
 
         <ApiKeyManager initialKey={apiKey} onSave={handleSaveApiKey} />
         
+        <div className="my-6">
+          <AdUnit adId="4148e069f07873a3aa7b034b7203392d" />
+        </div>
+
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 flex flex-col gap-6">
             
@@ -455,6 +459,11 @@ const App: React.FC = () => {
             <AdvicePanel layers={layers} baseColor={baseColor} paints={paints} apiKey={apiKey} />
           </div>
         </main>
+        
+        <footer className="mt-8">
+            <AdUnit adId="ced0be8cfd0ef999653360952f953d9a" />
+            <p className="text-center text-slate-500 text-sm mt-4">&copy; {new Date().getFullYear()} プラモ塗料 重ね塗りシミュレーター. All Rights Reserved.</p>
+        </footer>
       </div>
       <ColorMixerModal 
         isOpen={mixerState.isOpen}
