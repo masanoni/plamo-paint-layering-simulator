@@ -461,6 +461,9 @@ const App: React.FC = () => {
 
           <div className="lg:col-span-1">
             <AdvicePanel layers={layers} baseColor={baseColor} paints={paints} apiKey={apiKey} />
+            <div className="mt-6">
+              <AdUnit adId="d5d498b0fee3a3e27e223e19528b1d3f" />
+            </div>
           </div>
         </main>
         
