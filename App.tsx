@@ -414,6 +414,10 @@ const App: React.FC = () => {
             />
 
             <ColorReplicator onApplyRecipe={handleRecipeApply} paints={paints} apiKey={apiKey} />
+            
+            <div className="my-6">
+                <AdUnit adId="639e7e1d22e0cdaa4cb1ed5474ef207a" />
+            </div>
 
             <div className="bg-slate-800 p-6 rounded-lg shadow-lg">
                 <h2 className="text-xl font-bold text-slate-300 mb-4">塗装レイヤー設定</h2>
