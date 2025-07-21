@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { PaintLayer, Paint, PaintFinish, RecipeConditions, ParsedRecipe, PaintType, ParsedLayer, Brand, PaintSystem, FinishTypeGoal, TopCoatFinish } from '../types';
 
@@ -50,6 +49,7 @@ const mapFinishTypeGoalJaToEn = (type: FinishTypeGoal): string => {
         case 'メタリック': return 'Metallic Finish';
         case 'キャンディ': return 'Candy Finish';
         case '偏光塗装': return 'Prismatic/Color-shift Finish';
+        case 'おまかせ': return 'AI Recommended';
         default: return type;
     }
 }
@@ -58,6 +58,7 @@ const mapTopCoatFinishJaToEn = (type: TopCoatFinish): string => {
         case '光沢': return 'Gloss';
         case '半光沢': return 'Semi-gloss';
         case 'つや消し': return 'Matte';
+        case 'おまかせ': return 'AI Recommended';
         default: return type;
     }
 }
@@ -187,6 +188,9 @@ The JSON object must have the following structure:
   "recipeText": "string (A detailed step-by-step painting instruction guide in Japanese.)"
 }
 
+**Instructions:**
+- If a condition is "AI Recommended", you MUST choose the most suitable option to achieve the target color and describe your choice and reasoning in the "recipeText".
+
 ---
 # Target Color
 - HEX: ${targetColor}
@@ -201,7 +205,7 @@ The JSON object must have the following structure:
 ${simplifiedPaintsEn}
 ---
 
-Now, generate the JSON object based on these instructions.
+Now, generate the JSON object.
 `;
 
   try {
@@ -243,6 +247,128 @@ Now, generate the JSON object based on these instructions.
     throw new Error("AIからのレシピ取得中に不明なエラーが発生しました。");
   }
 };
+
+export const getConceptualRecipe = async (
+    baseConcept: string,
+    finishConcept: string,
+    conditions: RecipeConditions,
+    paints: Paint[],
+    apiKey: string
+): Promise<ParsedRecipe> => {
+    if (!apiKey) {
+        throw new Error("APIキーが設定されていません。「Google AI APIキー設定」からキーを入力してください。");
+    }
+    if (!baseConcept.trim() || !finishConcept.trim()) {
+        throw new Error("下地の色と完成イメージの両方を入力してください。");
+    }
+
+    const paintSystemJa: PaintSystem = Object.values(PaintSystem).includes(conditions.paintSystem as PaintSystem)
+        ? conditions.paintSystem as PaintSystem
+        : mapPaintSystemEnToJa(conditions.paintSystem);
+
+    const filteredPaints = paints.filter(p => p.paintSystem === paintSystemJa);
+    if (filteredPaints.length === 0) {
+        throw new Error(`選択された塗料系統「${paintSystemJa}」に利用可能な塗料がデータベースにありません。`);
+    }
+
+    const paintSystemEn = mapPaintSystemJaToEn(paintSystemJa);
+    const finishTypeEn = mapFinishTypeGoalJaToEn(conditions.finishType);
+    const topCoatEn = mapTopCoatFinishJaToEn(conditions.topCoat);
+
+    const simplifiedPaintsEn = filteredPaints.map(p => {
+        return `- Brand: ${mapBrandJaToEn(p.brand)}, Code: ${p.code}, Type: ${mapPaintTypeJaToEn(p.type)}, Finish: ${p.finish || 'gloss'}, HEX: ${p.hex}`;
+    }).join('\n');
+
+    const prompt = `
+You are a world-class professional model painter. A user wants to achieve a specific look based on a description. Your task is to generate a JSON object containing a painting recipe.
+
+**Your response MUST be ONLY a JSON object enclosed in a single markdown code block (\`\`\`json ... \`\`\`). Do not add any text before or after the JSON block.**
+
+The JSON object must have the following structure:
+{
+  "baseColorHex": "string (The proposed base color in HEX code format, e.g., '#808080'. This should represent the initial surface color before applying the layers.)",
+  "layers": [
+    {
+      "coats": "integer (Estimated number of coats, 1-10)",
+      "type": "string (Enum: 'Normal', 'Metallic', 'Pearl', 'Clear')",
+      "paintSystem": "string (Enum: 'Lacquer', 'Water-based', 'Acrysion'. Must match the user's specified system.)",
+      "finish": "string (Enum: 'gloss', 'matte', 'semi-gloss', 'velvet')",
+      "mixData": {
+        "paints": [
+          {
+            "code": "string (Product code from the available paints list.)",
+            "ratio": "integer (Mixing ratio %.)"
+          }
+        ]
+      }
+    }
+  ],
+  "topCoat": { /* same structure as a layer object, or null if not needed */ },
+  "products": [
+    "string (A list of all product names used in the recipe in Japanese, e.g., 'GSIクレオス Mr.カラー ホワイト (C1)')."
+  ],
+  "recipeText": "string (A detailed step-by-step painting instruction guide in Japanese. It should explain how to achieve the user's desired finish from their starting point.)"
+}
+
+**Instructions:**
+- If a condition is "AI Recommended", you MUST choose the most suitable option to achieve the desired appearance and describe your choice and reasoning in the "recipeText".
+
+---
+# User's Goal & Conditions
+
+- Starting Point / Base Layer Description: "${baseConcept}"
+- Desired Final Appearance Description: "${finishConcept}"
+- Desired Finish Style: "${finishTypeEn}"
+- Final Top Coat: "${topCoatEn}"
+- Paint System to Use: "${paintSystemEn}"
+
+# Your Available Paint List (For "${paintSystemEn}" system)
+${simplifiedPaintsEn}
+---
+
+Based on the user's descriptions and conditions, devise a practical, multi-step painting process. Interpret their creative request. For example, if they want a 'jewel-like red over a clear red base', you might suggest a silver base, then clear red, then a gloss top coat to achieve the depth and shine. Now, generate the JSON object.
+`;
+
+    try {
+        const ai = new GoogleGenAI({ apiKey });
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt
+        });
+
+        let jsonString = response.text;
+        const match = jsonString.match(/```json\s*([\s\S]*?)\s*```/);
+        if (match && match[1]) {
+            jsonString = match[1];
+        }
+
+        const rawResult = JSON.parse(jsonString.trim());
+
+        const mapLayer = (layer: any): ParsedLayer | null => {
+            if (!layer) return null;
+            return {
+                ...layer,
+                type: mapPaintTypeEnToJa(layer.type),
+                paintSystem: mapPaintSystemEnToJa(layer.paintSystem),
+            };
+        };
+
+        const parsedResult: ParsedRecipe = {
+            ...rawResult,
+            layers: rawResult.layers.map(mapLayer).filter((l): l is ParsedLayer => l !== null),
+            topCoat: mapLayer(rawResult.topCoat),
+        };
+
+        return parsedResult;
+    } catch (error) {
+        console.error("Error fetching or parsing conceptual recipe from Gemini API:", error);
+        if (error instanceof Error) {
+            throw new Error(`AIからのレシピ取得または解析中にエラーが発生しました: ${error.message}`);
+        }
+        throw new Error("AIからのレシピ取得中に不明なエラーが発生しました。");
+    }
+};
+
 
 export const getNewPaintInfo = async (paintNameQuery: string, availablePaints: Paint[], apiKey: string): Promise<Omit<Paint, 'amazonUrl' | 'rakutenUrl'>> => {
     if (!apiKey) {

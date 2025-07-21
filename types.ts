@@ -54,8 +54,8 @@ export interface PaintLayer {
 }
 
 // New types for Color Replicator conditions
-export type FinishTypeGoal = '通常' | 'メタリック' | 'キャンディ' | '偏光塗装';
-export type TopCoatFinish = '光沢' | '半光沢' | 'つや消し';
+export type FinishTypeGoal = '通常' | 'メタリック' | 'キャンディ' | '偏光塗装' | 'おまかせ';
+export type TopCoatFinish = '光沢' | '半光沢' | 'つや消し' | 'おまかせ';
 
 export interface RecipeConditions {
   baseCoat: string;
